@@ -303,13 +303,33 @@ int amf_nudm_sdm_handle_provisioned(
                 }
             }
         }
-        r = amf_ue_sbi_discover_and_send(
-                OpenAPI_service_name_nudm_sdm, NULL,
-                amf_nudm_sdm_build_get,
-                amf_ue, state,
-                (char *)OGS_SBI_RESOURCE_NAME_UE_CONTEXT_IN_SMF_DATA);
-        ogs_expect(r == OGS_OK);
-        ogs_assert(r != OGS_ERROR);
+        /*
+         * PANIC: o pedido a ue-context-in-smf-data foi retirado.
+         *
+         * A UDM do Open5GS responde-lhe sempre com um objeto vazio
+         * (src/udm/nudm-handler.c) e o AMF nunca lê o corpo da resposta: o
+         * tratamento deste recurso, logo abaixo, limita-se a encadear o pedido
+         * seguinte. Serviria para o AMF saber que sessões o UE tem noutro AMF,
+         * caso que numa SNPN com um único AMF não existe.
+         *
+         * Continua-se diretamente com o que o tratamento da resposta faria.
+         */
+        if (UDM_SDM_SUBSCRIBED(amf_ue)) {
+            r = amf_ue_sbi_discover_and_send(
+                    OpenAPI_service_name_npcf_am_policy_control, NULL,
+                    amf_npcf_am_policy_control_build_create,
+                    amf_ue, state, NULL);
+            ogs_expect(r == OGS_OK);
+            ogs_assert(r != OGS_ERROR);
+        }
+        else {
+            r = amf_ue_sbi_discover_and_send(
+                    OpenAPI_service_name_nudm_sdm, NULL,
+                    amf_nudm_sdm_build_subscription,
+                    amf_ue, state, (char *)OGS_SBI_RESOURCE_NAME_AM_DATA);
+            ogs_expect(r == OGS_OK);
+            ogs_assert(r != OGS_ERROR);
+        }
         break;
 
     CASE(OGS_SBI_RESOURCE_NAME_UE_CONTEXT_IN_SMF_DATA)
