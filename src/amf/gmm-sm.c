@@ -216,7 +216,7 @@ void gmm_state_de_registered(ogs_fsm_t *s, amf_event_t *e)
             CLEAR_AMF_UE_TIMER(amf_ue->t3513);
 
             ogs_timer_start(amf_ue->implicit_deregistration.timer,
-                    ogs_time_from_sec(amf_self()->time.t3512.value + 240));
+                    ogs_time_from_sec(amf_ue->t3512_value + 240));
             break;
 
         case AMF_TIMER_IMPLICIT_DEREGISTRATION:
@@ -1037,7 +1037,7 @@ void gmm_state_registered(ogs_fsm_t *s, amf_event_t *e)
             CLEAR_AMF_UE_TIMER(amf_ue->t3513);
 
             ogs_timer_start(amf_ue->implicit_deregistration.timer,
-                    ogs_time_from_sec(amf_self()->time.t3512.value + 240));
+                    ogs_time_from_sec(amf_ue->t3512_value + 240));
             break;
 
         case AMF_TIMER_IMPLICIT_DEREGISTRATION:

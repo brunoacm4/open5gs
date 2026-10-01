@@ -126,6 +126,10 @@ static int amf_context_prepare(void)
 
     self.ngap_port = OGS_NGAP_SCTP_PORT;
 
+    /* PANIC: T3512 dinâmico desligado; se ligado, no máximo 1 hora */
+    self.time.t3512.dynamic = false;
+    self.time.t3512.max = 3600;
+
     return OGS_OK;
 }
 
@@ -196,6 +200,21 @@ static int amf_context_validation(void)
         OGS_OK) {
         ogs_error("Not support GPRS Timer 3 [%d]", (int)self.time.t3512.value);
         return OGS_ERROR;
+    }
+    if (self.time.t3512.dynamic) {
+        /* PANIC: o valor ajustado nunca passa do máximo, que tem de caber
+         * no Registration Accept */
+        if (self.time.t3512.max < self.time.t3512.value) {
+            ogs_error("amf.time.t3512.max [%d] below value [%d]",
+                    (int)self.time.t3512.max, (int)self.time.t3512.value);
+            return OGS_ERROR;
+        }
+        if (ogs_nas_gprs_timer_3_from_sec(
+                    &gprs_timer, self.time.t3512.max) != OGS_OK) {
+            ogs_error("Not support GPRS Timer 3 [%d]",
+                    (int)self.time.t3512.max);
+            return OGS_ERROR;
+        }
     }
 
     return OGS_OK;
@@ -1049,6 +1068,14 @@ int amf_context_parse_config(void)
                                     const char *v = ogs_yaml_iter_value(&t3512_iter);
                                     if (v)
                                         self.time.t3512.value = atoll(v);
+                                } else if (!strcmp(t3512_key, "dynamic")) {
+                                    /* PANIC: T3512 dinâmico */
+                                    self.time.t3512.dynamic =
+                                        ogs_yaml_iter_bool(&t3512_iter);
+                                } else if (!strcmp(t3512_key, "max")) {
+                                    const char *v = ogs_yaml_iter_value(&t3512_iter);
+                                    if (v)
+                                        self.time.t3512.max = atoll(v);
                                 } else
                                     ogs_warn("unknown key `%s`", t3512_key);
                             }
@@ -1668,6 +1695,9 @@ amf_ue_t *amf_ue_add(ran_ue_t *ran_ue)
         return NULL;
     }
     amf_ue->implicit_deregistration.pkbuf = NULL;
+
+    /* PANIC: cada UE começa com o T3512 global */
+    amf_ue->t3512_value = self.time.t3512.value;
 
     /* SBI Type */
     amf_ue->sbi.type = OGS_SBI_OBJ_UE_TYPE;

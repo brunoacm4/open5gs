@@ -34,6 +34,8 @@ static ogs_nas_5gmm_cause_t gmm_handle_nas_message_container(
 
 static uint8_t gmm_cause_from_access_control(ogs_plmn_id_t *plmn_id);
 
+static void gmm_update_t3512(amf_ue_t *amf_ue);
+
 ogs_nas_5gmm_cause_t gmm_handle_registration_request(amf_ue_t *amf_ue,
         ogs_nas_security_header_type_t h, NGAP_ProcedureCode_t ngap_code,
         ogs_nas_5gs_registration_request_t *registration_request)
@@ -368,6 +370,15 @@ ogs_nas_5gmm_cause_t gmm_handle_registration_request(amf_ue_t *amf_ue,
         ogs_error("Registration rejected due to RAT restrictions");
         return OGS_5GMM_CAUSE_5GS_SERVICES_NOT_ALLOWED;
     }
+
+    /*
+     * PANIC: escolher o T3512 que vai no Registration Accept deste registo.
+     * Esta função corre uma vez por Registration Request recebido (o pedido
+     * dentro do NAS message container vai para gmm_handle_registration_update)
+     * e o Accept é construído depois; as retransmissões do T3550 reenviam o
+     * mesmo Accept. A regra aplica-se, portanto, uma vez por registo.
+     */
+    gmm_update_t3512(amf_ue);
 
     return OGS_5GMM_CAUSE_REQUEST_ACCEPTED;
 }
@@ -1917,4 +1928,56 @@ static uint8_t gmm_cause_from_access_control(ogs_plmn_id_t *plmn_id)
         return amf_self()->default_reject_cause;
 
     return OGS_5GMM_CAUSE_PLMN_NOT_ALLOWED;
+}
+
+/*
+ * PANIC: T3512 dinâmico (fase 1).
+ *
+ * Um registo periódico só acontece se o UE dormir mais do que o seu T3512.
+ * Quando isso acontece, o AMF responde-lhe com o dobro do valor, arredondado
+ * para cima para um valor que o GPRS Timer 3 consiga representar, e nunca
+ * acima de amf.time.t3512.max. TS 23.501 5.3.2: o AMF atribui o valor a cada
+ * UE segundo políticas locais.
+ *
+ * Um registo inicial volta ao valor global; os outros tipos mantêm o valor.
+ * Com o modo desligado, o valor é sempre o global, como no Open5GS original.
+ */
+static void gmm_update_t3512(amf_ue_t *amf_ue)
+{
+    /*
+     * Passos da codificação GPRS Timer 3, em segundos
+     * (ogs_nas_gprs_timer_3_from_sec): cada unidade vai até 31 passos.
+     */
+    static const ogs_time_t step[] = { 2, 30, 60, 600, 3600, 36000, 1152000 };
+    ogs_time_t old_value, new_value;
+    int i;
+
+    ogs_assert(amf_ue);
+
+    if (!amf_self()->time.t3512.dynamic ||
+        amf_ue->nas.registration.value ==
+            OGS_NAS_5GS_REGISTRATION_TYPE_INITIAL) {
+        amf_ue->t3512_value = amf_self()->time.t3512.value;
+        return;
+    }
+
+    if (amf_ue->nas.registration.value !=
+            OGS_NAS_5GS_REGISTRATION_TYPE_PERIODIC_UPDATING)
+        return;
+
+    old_value = amf_ue->t3512_value;
+    new_value = 2 * old_value;
+
+    for (i = 0; i < OGS_ARRAY_SIZE(step); i++) {
+        if (new_value <= 31 * step[i]) {
+            new_value = ((new_value + step[i] - 1) / step[i]) * step[i];
+            break;
+        }
+    }
+
+    /* O máximo foi validado como representável (amf_context_validation) */
+    amf_ue->t3512_value = ogs_min(new_value, amf_self()->time.t3512.max);
+
+    ogs_info("[%s] Dynamic T3512 [%lld -> %lld sec]", amf_ue->supi,
+            (long long)old_value, (long long)amf_ue->t3512_value);
 }

@@ -665,7 +665,7 @@ static void amf_sbi_release_ran_ue_on_gnb_remove(
      */
     if (OGS_FSM_CHECK(&amf_ue->sm, gmm_state_registered)) {
         ogs_timer_start(amf_ue->mobile_reachable.timer,
-                ogs_time_from_sec(amf_self()->time.t3512.value + 240));
+                ogs_time_from_sec(amf_ue->t3512_value + 240));
     } else {
         amf_ue_remove(amf_ue);
     }

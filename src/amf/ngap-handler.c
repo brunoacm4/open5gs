@@ -2014,7 +2014,7 @@ void ngap_handle_ue_context_release_action(ran_ue_t *ran_ue)
         if (amf_ue) {
             amf_ue_deassociate_ran_ue(amf_ue, ran_ue);
             ogs_timer_start(amf_ue->mobile_reachable.timer,
-                    ogs_time_from_sec(amf_self()->time.t3512.value + 240));
+                    ogs_time_from_sec(amf_ue->t3512_value + 240));
         } else
             ogs_error("No UE(amf-ue) Context");
 
@@ -5340,7 +5340,7 @@ void ngap_handle_error_indication(amf_gnb_t *gnb, ogs_ngap_message_t *message)
                 ran_ue_remove(ran_ue);
                 ogs_timer_start(amf_ue->mobile_reachable.timer,
                         ogs_time_from_sec(
-                            amf_self()->time.t3512.value + 240));
+                            amf_ue->t3512_value + 240));
             }
         } else {
             ran_ue_remove(ran_ue);

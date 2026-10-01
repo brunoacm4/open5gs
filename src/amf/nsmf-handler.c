@@ -824,7 +824,7 @@ int amf_nsmf_pdusession_handle_update_sm_context(
          */
                     ogs_timer_start(amf_ue->mobile_reachable.timer,
                             ogs_time_from_sec(
-                                amf_self()->time.t3512.value + 240));
+                                amf_ue->t3512_value + 240));
                 }
 
             } else if (state == AMF_REMOVE_N2_CONTEXT_BY_ERROR_INDICATION) {
@@ -841,7 +841,7 @@ int amf_nsmf_pdusession_handle_update_sm_context(
 
                     ogs_timer_start(amf_ue->mobile_reachable.timer,
                             ogs_time_from_sec(
-                                amf_self()->time.t3512.value + 240));
+                                amf_ue->t3512_value + 240));
                 }
                 
             } else if (state == AMF_REMOVE_S1_CONTEXT_BY_RESET_ALL) {
@@ -896,7 +896,7 @@ int amf_nsmf_pdusession_handle_update_sm_context(
          */
                     ogs_timer_start(amf_ue->mobile_reachable.timer,
                             ogs_time_from_sec(
-                                amf_self()->time.t3512.value + 240));
+                                amf_ue->t3512_value + 240));
                 }
 
             } else if (state == AMF_REMOVE_S1_CONTEXT_BY_RESET_PARTIAL) {
@@ -967,7 +967,7 @@ int amf_nsmf_pdusession_handle_update_sm_context(
          */
                     ogs_timer_start(amf_ue->mobile_reachable.timer,
                             ogs_time_from_sec(
-                                amf_self()->time.t3512.value + 240));
+                                amf_ue->t3512_value + 240));
                 }
             } else {
                 ogs_error("Invalid STATE[%d]", state);

@@ -127,7 +127,20 @@ typedef struct amf_context_s {
     struct {
         struct {
             ogs_time_t value;       /* Timer Value(Seconds) */
-        } t3502, t3512;
+        } t3502;
+        struct {
+            ogs_time_t value;       /* Timer Value(Seconds) */
+
+            /*
+             * PANIC: T3512 dinâmico. Quando ligado, cada UE que faz um registo
+             * periódico recebe um T3512 duplicado (até ao máximo): se fez o
+             * registo periódico é porque dorme mais do que o seu T3512.
+             * TS 23.501 5.3.2: o AMF atribui o valor a cada UE segundo
+             * políticas locais.
+             */
+            bool dynamic;           /* ajustar o valor de cada UE */
+            ogs_time_t max;         /* limite do valor ajustado (segundos) */
+        } t3512;
     } time;
 
 } amf_context_t;
@@ -643,6 +656,13 @@ struct amf_ue_s {
         ogs_timer_t     *timer;
         uint32_t        retry_count;;
     } t3513, t3522, t3550, t3555, t3560, t3570, mobile_reachable, implicit_deregistration;
+
+    /*
+     * PANIC: T3512 atribuído a este UE (segundos). É o que vai no Registration
+     * Accept e a base dos temporizadores de alcançabilidade (+ 240 s).
+     * Começa no valor global; só muda com amf.time.t3512.dynamic ligado.
+     */
+    ogs_time_t t3512_value;
 
     /* UE Radio Capability */
     OCTET_STRING_t  ueRadioCapability;

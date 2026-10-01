@@ -130,9 +130,10 @@ ogs_pkbuf_t *gmm_build_registration_accept(amf_ue_t *amf_ue)
         ims_voice_over_ps_session_over_3gpp_access_indicator = 1;
 
     /* Set T3512 : Mandatory in Open5GS */
-    ogs_assert(amf_self()->time.t3512.value);
+    /* PANIC: o valor deste UE (gmm_update_t3512), não o global */
+    ogs_assert(amf_ue->t3512_value);
     rv = ogs_nas_gprs_timer_3_from_sec(
-            &t3512_value->t, amf_self()->time.t3512.value);
+            &t3512_value->t, amf_ue->t3512_value);
     ogs_assert(rv == OGS_OK);
     registration_accept->presencemask |=
         OGS_NAS_5GS_REGISTRATION_ACCEPT_T3512_VALUE_PRESENT;
