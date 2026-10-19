@@ -626,11 +626,14 @@ bool pcf_npcf_smpolicycontrol_handle_delete(pcf_sess_t *sess,
         pcf_sbi_send_policyauthorization_terminate_notify(app_session);
     }
 
-    if (pcf_sessions_number_by_snssai_and_dnn(
-                pcf_ue_sm, &sess->s_nssai, sess->dnn) > 1) {
-        ogs_expect(true ==
-                ogs_sbi_send_response(stream, OGS_SBI_HTTP_STATUS_NO_CONTENT));
-    } else if (sess->binding.resource_uri) {
+    /*
+     * PANIC: each PDU session registers its own binding (keyed by its UE
+     * address in the BSF), so each session removes its own. The former check
+     * "more than one session with this S-NSSAI and DNN -> keep the binding"
+     * (commit 758cf9dd7, 2021) left the bindings of the other sessions in the
+     * BSF after their release.
+     */
+    if (sess->binding.resource_uri) {
         r = pcf_sess_sbi_discover_and_send(
                 OpenAPI_service_name_nbsf_management, NULL,
                 pcf_nbsf_management_build_de_register, sess, stream, NULL);
