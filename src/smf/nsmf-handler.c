@@ -775,6 +775,7 @@ bool smf_nsmf_handle_update_sm_context(
                 sess, stream, SmContextUpdateData->n2_sm_info_type, n2smbuf);
 
     } else if (SmContextUpdateData->up_cnx_state) {
+        OpenAPI_up_cnx_state_e prev_up_cnx_state = sess->up_cnx_state;
 
         sess->up_cnx_state = SmContextUpdateData->up_cnx_state;
 
@@ -784,7 +785,18 @@ bool smf_nsmf_handle_update_sm_context(
         /*********************************************************
          * Handle DEACTIVATED
          ********************************************************/
-            if (sess->ngap_state.pdu_session_resource_release ==
+            if (prev_up_cnx_state == OpenAPI_up_cnx_state_DEACTIVATED &&
+                !HOME_ROUTED_ROAMING_IN_VSMF(sess)) {
+/*
+ * PANIC: the user plane is already deactivated. The AMF asks to deactivate
+ * every session with an SM context on each AN Release, e.g. after a periodic
+ * registration that never activated the user plane (TS 23.502 §4.2.6 step 5
+ * only covers the PDU sessions with active N3). The UPF is already buffering:
+ * answer without a PFCP Session Modification.
+ */
+                smf_sbi_send_sm_context_updated_data_up_cnx_state(
+                        sess, stream, OpenAPI_up_cnx_state_DEACTIVATED);
+            } else if (sess->ngap_state.pdu_session_resource_release ==
                     SMF_NGAP_STATE_DELETE_TRIGGER_UE_REQUESTED) {
 /*
  * If UE initiates PDU Session Release, PFCP context is already removed.
