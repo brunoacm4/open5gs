@@ -499,6 +499,16 @@ void ogs_log_hexdump_func(ogs_log_level_e level, int id,
     char dumpstr[OGS_HUGE_LEN];
     char *p, *last;
 
+    /*
+     * PANIC: do not format a dump that will not be printed. The dump is
+     * printed by ogs_log_print() below, i.e. with OGS_LOG_DOMAIN of this file,
+     * so the same domain decides here. Most callers ask for OGS_LOG_DEBUG on
+     * every message (e.g. each HTTP/2 write of the SBI server), and formatting
+     * took ~7% of the CPU of each UE wake-up/sleep cycle.
+     */
+    if (ogs_log_get_domain_level(OGS_LOG_DOMAIN) < level)
+        return;
+
     last = dumpstr + OGS_HUGE_LEN;
     p = dumpstr;
 
