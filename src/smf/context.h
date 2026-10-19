@@ -446,6 +446,13 @@ typedef struct smf_sess_s {
 
     OpenAPI_up_cnx_state_e up_cnx_state;
 
+    /*
+     * PANIC: the UDM confirmed Nudm_UECM_Registration for this session.
+     * The N4 activation path registers the SMF only once (at the end of PDU
+     * Session Establishment), not on every network-triggered activation.
+     */
+    bool udm_registered;
+
     /* Serving PLMN ID & Home PLMN ID */
     ogs_plmn_id_t serving_plmn_id;
     ogs_plmn_id_t home_plmn_id;

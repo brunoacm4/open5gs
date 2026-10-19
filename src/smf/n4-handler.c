@@ -814,6 +814,22 @@ void smf_5gc_n4_handle_session_modification_response(
                 sess->up_cnx_state = OpenAPI_up_cnx_state_ACTIVATED;
                 smf_sbi_send_sm_context_updated_data_up_cnx_state(
                         sess, stream, OpenAPI_up_cnx_state_ACTIVATED);
+            } else if (sess->udm_registered) {
+                /*
+                 * PANIC: network-triggered activation (N1N2 transfer, paging,
+                 * Service Request) of a session whose SMF is already
+                 * registered in the UDM. Nudm_UECM_Registration belongs to PDU
+                 * Session Establishment (TS 23.502 §4.3.2.2.1), not to the
+                 * Service Request (§4.2.3.3): answer the AMF directly, as the
+                 * registration path below does, and record that the user
+                 * plane is active again.
+                 */
+                sess->up_cnx_state = OpenAPI_up_cnx_state_ACTIVATED;
+                if (stream)
+                    ogs_assert(true ==
+                            ogs_sbi_send_http_status_no_content(stream));
+                else
+                    ogs_error("Stream has already been removed");
             } else {
                 r = smf_sbi_discover_and_send(
                         OpenAPI_service_name_nudm_uecm, NULL,

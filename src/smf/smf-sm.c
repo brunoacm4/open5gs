@@ -1085,6 +1085,10 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
                 break;
             }
 
+            if (state == SMF_UECM_STATE_REGISTERED ||
+                state == SMF_UECM_STATE_REGISTERED_HR)
+                sess->udm_registered = true;
+
             if (state == SMF_UECM_STATE_REGISTERED) {
                 if (stream)
                     ogs_assert(true ==
