@@ -55,6 +55,9 @@ amf:
 #      value: 720   # 12 minutes * 60 = 720 seconds
     t3512:
       value: 540    # 9 minutes * 60 = 540 seconds
+#    implicit_deregistration:  # PANIC: time after the UE becomes unreachable
+#      value: 86400            # (mobile reachable timer); "never" or 0 = keep it
+#                              # registered; absent = T3512 + 240 s (Open5GS)
 
 ################################################################################
 # SBI Server

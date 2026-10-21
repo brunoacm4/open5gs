@@ -649,6 +649,9 @@ int ogs_app_parse_local_conf(const char *local)
                             /* handle config in amf */
                         } else if (!strcmp(time_key, "t3512")) {
                             /* handle config in amf */
+                        } else if (!strcmp(time_key,
+                                    "implicit_deregistration")) {
+                            /* handle config in amf (PANIC) */
                         } else if (!strcmp(time_key, "t3402")) {
                             /* handle config in mme */
                         } else if (!strcmp(time_key, "t3412")) {

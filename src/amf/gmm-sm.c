@@ -215,8 +215,13 @@ void gmm_state_de_registered(ogs_fsm_t *s, amf_event_t *e)
             AMF_UE_CLEAR_5GSM_MESSAGE(amf_ue);
             CLEAR_AMF_UE_TIMER(amf_ue->t3513);
 
-            ogs_timer_start(amf_ue->implicit_deregistration.timer,
-                    ogs_time_from_sec(amf_ue->t3512_value + 240));
+            /* PANIC: desregisto implícito configurável (0 = desligado) */
+            if (amf_ue_implicit_deregistration_duration(amf_ue))
+                ogs_timer_start(amf_ue->implicit_deregistration.timer,
+                        amf_ue_implicit_deregistration_duration(amf_ue));
+            else
+                ogs_info("[%s] Unreachable, kept registered "
+                        "(implicit de-registration disabled)", amf_ue->supi);
             break;
 
         case AMF_TIMER_IMPLICIT_DEREGISTRATION:
@@ -1036,8 +1041,13 @@ void gmm_state_registered(ogs_fsm_t *s, amf_event_t *e)
             AMF_UE_CLEAR_5GSM_MESSAGE(amf_ue);
             CLEAR_AMF_UE_TIMER(amf_ue->t3513);
 
-            ogs_timer_start(amf_ue->implicit_deregistration.timer,
-                    ogs_time_from_sec(amf_ue->t3512_value + 240));
+            /* PANIC: desregisto implícito configurável (0 = desligado) */
+            if (amf_ue_implicit_deregistration_duration(amf_ue))
+                ogs_timer_start(amf_ue->implicit_deregistration.timer,
+                        amf_ue_implicit_deregistration_duration(amf_ue));
+            else
+                ogs_info("[%s] Unreachable, kept registered "
+                        "(implicit de-registration disabled)", amf_ue->supi);
             break;
 
         case AMF_TIMER_IMPLICIT_DEREGISTRATION:

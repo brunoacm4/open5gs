@@ -130,6 +130,10 @@ static int amf_context_prepare(void)
     self.time.t3512.dynamic = false;
     self.time.t3512.max = 3600;
 
+    /* PANIC: desregisto implícito como no Open5GS (T3512 + 4 min) */
+    self.time.implicit_deregistration.configured = false;
+    self.time.implicit_deregistration.value = 0;
+
     return OGS_OK;
 }
 
@@ -215,6 +219,12 @@ static int amf_context_validation(void)
                     (int)self.time.t3512.max);
             return OGS_ERROR;
         }
+    }
+    if (self.time.implicit_deregistration.configured &&
+        self.time.implicit_deregistration.value < 0) {
+        ogs_error("amf.time.implicit_deregistration.value [%lld] below 0",
+                (long long)self.time.implicit_deregistration.value);
+        return OGS_ERROR;
     }
 
     return OGS_OK;
@@ -1079,6 +1089,30 @@ int amf_context_parse_config(void)
                                 } else
                                     ogs_warn("unknown key `%s`", t3512_key);
                             }
+                        } else if (!strcmp(time_key,
+                                    "implicit_deregistration")) {
+                            /* PANIC: desregisto implícito configurável */
+                            ogs_yaml_iter_t idt_iter;
+                            ogs_yaml_iter_recurse(&time_iter, &idt_iter);
+
+                            while (ogs_yaml_iter_next(&idt_iter)) {
+                                const char *idt_key =
+                                    ogs_yaml_iter_key(&idt_iter);
+                                ogs_assert(idt_key);
+
+                                if (!strcmp(idt_key, "value")) {
+                                    const char *v =
+                                        ogs_yaml_iter_value(&idt_iter);
+                                    if (v) {
+                                        self.time.implicit_deregistration.
+                                            configured = true;
+                                        self.time.implicit_deregistration.
+                                            value = strcmp(v, "never") ?
+                                                atoll(v) : 0;
+                                    }
+                                } else
+                                    ogs_warn("unknown key `%s`", idt_key);
+                            }
                         } else if (!strcmp(time_key, "t3412")) {
                             /* handle config in mme */
                         } else if (!strcmp(time_key, "nf_instance")) {
@@ -1730,6 +1764,20 @@ amf_ue_t *amf_ue_add(ran_ue_t *ran_ue)
             ogs_list_count(&self.amf_ue_list));
 
     return amf_ue;
+}
+
+/*
+ * PANIC: duração do desregisto implícito de um UE, contada a partir do momento
+ * em que fica inalcançável. 0 = não desregistar (o temporizador não arranca).
+ */
+ogs_time_t amf_ue_implicit_deregistration_duration(amf_ue_t *amf_ue)
+{
+    ogs_assert(amf_ue);
+
+    if (!self.time.implicit_deregistration.configured)
+        return ogs_time_from_sec(amf_ue->t3512_value + 240);
+
+    return ogs_time_from_sec(self.time.implicit_deregistration.value);
 }
 
 void amf_ue_remove(amf_ue_t *amf_ue)

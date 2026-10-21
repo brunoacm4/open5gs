@@ -141,6 +141,19 @@ typedef struct amf_context_s {
             bool dynamic;           /* ajustar o valor de cada UE */
             ogs_time_t max;         /* limite do valor ajustado (segundos) */
         } t3512;
+
+        /*
+         * PANIC: desregisto implícito configurável (fase 1). Tempo entre o UE
+         * ficar inalcançável (expira o mobile reachable timer) e o desregisto
+         * implícito, que apaga o contexto e as sessões. TS 24.501 5.3.7: o
+         * valor "is network dependent". Sem configuração: T3512 + 4 min, como
+         * no Open5GS. Com 0 ("never"): o UE fica registado e inalcançável até
+         * voltar (ou até um registo inicial o substituir).
+         */
+        struct {
+            bool configured;
+            ogs_time_t value;       /* Segundos; 0 = desligado */
+        } implicit_deregistration;
     } time;
 
 } amf_context_t;
@@ -1031,6 +1044,7 @@ void amf_ue_new_guti(amf_ue_t *amf_ue);
 void amf_ue_confirm_guti(amf_ue_t *amf_ue);
 
 amf_ue_t *amf_ue_add(ran_ue_t *ran_ue);
+ogs_time_t amf_ue_implicit_deregistration_duration(amf_ue_t *amf_ue);
 void amf_ue_remove(amf_ue_t *amf_ue);
 void amf_ue_remove_all(void);
 
