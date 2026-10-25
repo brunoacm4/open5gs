@@ -23,6 +23,7 @@
 #include "sbi-path.h"
 
 #include "gmm-build.h"
+#include "persistence.h"
 
 int amf_nsmf_pdusession_handle_create_sm_context(
         amf_ue_t *amf_ue, ran_ue_t *ran_ue, amf_sess_t *sess,
@@ -147,6 +148,9 @@ int amf_nsmf_pdusession_handle_create_sm_context(
                 sess, header.uri, message.h.resource.component[1]);
 
         ogs_sbi_header_free(&header);
+
+        /* PANIC: contexto persistente. Sessão nova com contexto no SMF */
+        amf_persistence_save(amf_ue);
 
         if (sess->pdu_session_establishment_accept) {
             /*

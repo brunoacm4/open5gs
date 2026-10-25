@@ -24,6 +24,7 @@
 #include "nas-security.h"
 #include "ngap-path.h"
 #include "nausf-handler.h"
+#include "persistence.h"
 #include "nsmf-handler.h"
 #include "nudm-handler.h"
 #include "npcf-handler.h"
@@ -110,6 +111,10 @@ void gmm_state_de_registered(ogs_fsm_t *s, amf_event_t *e)
         AMF_UE_CLEAR_N2_TRANSFER(amf_ue, pdu_session_resource_setup_request);
         AMF_UE_CLEAR_5GSM_MESSAGE(amf_ue);
         CLEAR_AMF_UE_ALL_TIMERS(amf_ue);
+
+        /* PANIC: contexto persistente. Desregistado (explícito ou implícito):
+         * apagar o registo; num UE acabado de criar ainda não há SUPI */
+        amf_persistence_delete(amf_ue);
 
         /*
          * Issue #2040
@@ -3367,6 +3372,9 @@ void gmm_state_ue_context_will_remove(ogs_fsm_t *s, amf_event_t *e)
 
     switch (e->h.id) {
     case OGS_FSM_ENTRY_SIG:
+        /* PANIC: contexto persistente. Desregisto pela rede (implícito ou
+         * explícito): apagar o registo antes de remover o contexto */
+        amf_persistence_delete(amf_ue);
         amf_ue_remove(amf_ue);
         break;
 

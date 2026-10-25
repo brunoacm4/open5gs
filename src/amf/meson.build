@@ -64,6 +64,7 @@ libamf_sources = files('''
     metrics.c
     gnb-info.c
     ue-info.c
+    persistence.c
     ../../lib/metrics/prometheus/json_pager.c
 '''.split())
 

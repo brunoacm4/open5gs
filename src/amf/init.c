@@ -25,6 +25,7 @@
 #include "metrics/prometheus/json_pager.h"
 #include "gnb-info.h"
 #include "ue-info.h"
+#include "persistence.h"
 
 static ogs_thread_t *thread;
 static void amf_main(void *data);
@@ -75,6 +76,11 @@ int amf_initialize(void)
     ogs_metrics_register_custom_ep(amf_dump_gnb_info, "/gnb-info");
     ogs_metrics_register_custom_ep(amf_dump_ue_info, "/ue-info");
 
+    /* PANIC: contexto persistente. Reconstruir os UEs registados antes de
+     * abrir o SBI e o NGAP (precisa das métricas, para o estado registado) */
+    rv = amf_persistence_restore();
+    if (rv != OGS_OK) return rv;
+
     rv = amf_sbi_open();
     if (rv != OGS_OK) return rv;
 
@@ -116,6 +122,10 @@ static void event_termination(void)
 void amf_terminate(void)
 {
     if (!initialized) return;
+
+    /* PANIC: contexto persistente. O encerramento remove os contextos da RAM,
+     * mas não os desregista: não mexer na base de dados daqui em diante */
+    amf_persistence_stop();
 
     /* Daemon terminating */
     event_termination();

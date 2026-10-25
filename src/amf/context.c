@@ -18,6 +18,7 @@
  */
 
 #include "ngap-path.h"
+#include "persistence.h"
 
 static amf_context_t self;
 
@@ -1676,6 +1677,10 @@ void amf_ue_confirm_guti(amf_ue_t *amf_ue)
 
     /* Clear Next GUTI */
     amf_ue->next.m_tmsi = NULL;
+
+    /* PANIC: contexto persistente. GUTI novo (registo ou depois de um paging):
+     * gravar a parte estável, que nesse momento inclui o contexto de segurança */
+    amf_persistence_save(amf_ue);
 }
 
 amf_ue_t *amf_ue_add(ran_ue_t *ran_ue)
@@ -1683,12 +1688,14 @@ amf_ue_t *amf_ue_add(ran_ue_t *ran_ue)
     amf_gnb_t *gnb = NULL;
     amf_ue_t *amf_ue = NULL;
 
-    ogs_assert(ran_ue);
-
-    gnb = amf_gnb_find_by_id(ran_ue->gnb_id);
-    if (!gnb) {
-        ogs_error("[%d] gNB has already been removed", ran_ue->gnb_id);
-        return NULL;
+    /* PANIC: ran_ue == NULL no restauro do contexto persistente (UE em
+     * CM-IDLE, sem gNB); a localização vem do registo guardado */
+    if (ran_ue) {
+        gnb = amf_gnb_find_by_id(ran_ue->gnb_id);
+        if (!gnb) {
+            ogs_error("[%d] gNB has already been removed", ran_ue->gnb_id);
+            return NULL;
+        }
     }
 
     ogs_pool_id_calloc(&amf_ue_pool, &amf_ue);
@@ -1787,10 +1794,14 @@ amf_ue_t *amf_ue_add(ran_ue_t *ran_ue)
     ogs_list_init(&amf_ue->sess_list);
 
     /* Initialization */
-    amf_ue->gnb_ostream_id = ran_ue->gnb_ostream_id;
-    memcpy(&amf_ue->nr_tai, &ran_ue->saved.nr_tai, sizeof(ogs_5gs_tai_t));
-    memcpy(&amf_ue->nr_cgi, &ran_ue->saved.nr_cgi, sizeof(ogs_nr_cgi_t));
-    amf_ue->nr_cgi_gnb_id_length = ran_ue->saved.nr_cgi_gnb_id_length;
+    if (ran_ue) {
+        amf_ue->gnb_ostream_id = ran_ue->gnb_ostream_id;
+        memcpy(&amf_ue->nr_tai,
+                &ran_ue->saved.nr_tai, sizeof(ogs_5gs_tai_t));
+        memcpy(&amf_ue->nr_cgi,
+                &ran_ue->saved.nr_cgi, sizeof(ogs_nr_cgi_t));
+        amf_ue->nr_cgi_gnb_id_length = ran_ue->saved.nr_cgi_gnb_id_length;
+    }
 
     amf_ue->guami = &amf_self()->served_guami[0];
     amf_ue->nas.access_type = OGS_ACCESS_TYPE_3GPP;
@@ -2617,9 +2628,11 @@ void amf_sess_remove(amf_sess_t *sess)
     ogs_assert(sess);
 
     amf_ue = amf_ue_find_by_id(sess->amf_ue_id);
-    if (amf_ue)
+    if (amf_ue) {
         ogs_list_remove(&amf_ue->sess_list, sess);
-    else
+        /* PANIC: contexto persistente. Sessão libertada com o UE registado */
+        amf_persistence_save_if_registered(amf_ue);
+    } else
         ogs_error("UE(amf-ue) context has already been removed");
 
     /* Free SBI object memory */
@@ -2923,6 +2936,35 @@ amf_m_tmsi_t *amf_m_tmsi_alloc(void)
     *m_tmsi |= 0xc0000000;
 
     return m_tmsi;
+}
+
+/*
+ * PANIC: contexto persistente. Reserva no pool o M-TMSI que um UE já tinha
+ * (desfaz a transformação de amf_m_tmsi_alloc para encontrar a entrada livre),
+ * para não ser dado a outro UE depois do restauro. NULL se não estiver livre.
+ */
+amf_m_tmsi_t *amf_m_tmsi_reserve(uint32_t m_tmsi)
+{
+    amf_m_tmsi_t *node = NULL;
+    uint32_t raw;
+    int i;
+
+    raw = m_tmsi & 0x3fffffff;
+    raw = ((raw & 0xffff) | ((raw & 0x3f000000) >> 8));
+
+    for (i = 0; i < ogs_pool_size(&m_tmsi_pool); i++) {
+        if (m_tmsi_pool.array[i] == raw) {
+            ogs_pool_alloc_node(&m_tmsi_pool, &node, &m_tmsi_pool.array[i]);
+            break;
+        }
+    }
+    if (!node)
+        return NULL;
+
+    *node = ((*node & 0xffff) | ((*node & 0x003f0000) << 8));
+    *node |= 0xc0000000;
+
+    return node;
 }
 
 int amf_m_tmsi_free(amf_m_tmsi_t *m_tmsi)

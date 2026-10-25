@@ -704,6 +704,14 @@ struct amf_ue_s {
      */
     bool ppf;
 
+    /*
+     * PANIC: contexto persistente (fase 1b). restored: o contexto veio da base
+     * de dados no arranque (a primeira mensagem do UE leva a chave nova);
+     * persisted_ul_count: o último contador de subida gravado.
+     */
+    bool restored;
+    uint32_t persisted_ul_count;
+
     /* UE Radio Capability */
     OCTET_STRING_t  ueRadioCapability;
 
@@ -1201,6 +1209,7 @@ ogs_s_nssai_t *amf_find_s_nssai(
         ogs_plmn_id_t *served_plmn_id, ogs_s_nssai_t *s_nssai);
 
 amf_m_tmsi_t *amf_m_tmsi_alloc(void);
+amf_m_tmsi_t *amf_m_tmsi_reserve(uint32_t m_tmsi);
 int amf_m_tmsi_free(amf_m_tmsi_t *tmsi);
 
 uint8_t amf_selected_int_algorithm(amf_ue_t *amf_ue);

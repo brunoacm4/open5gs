@@ -18,6 +18,7 @@
  */
 
 #include "nas-security.h"
+#include "persistence.h"
 
 #define NAS_SECURITY_MAC_SIZE 4
 
@@ -170,6 +171,10 @@ int nas_5gs_security_decode(amf_ue_t *amf_ue,
                 ogs_warn("NAS MAC verification failed(0x%x != 0x%x)",
                     be32toh(h->message_authentication_code), be32toh(mac32));
                 amf_ue->mac_failed = 1;
+            } else {
+                /* PANIC: contexto persistente. Contador de subida de 128 em
+                 * 128, só de mensagens verificadas */
+                amf_persistence_save_ul_count(amf_ue);
             }
         }
 
