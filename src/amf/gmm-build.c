@@ -471,6 +471,9 @@ ogs_pkbuf_t *gmm_build_security_mode_command(amf_ue_t *amf_ue)
     additional_security_information->length = 1;
     additional_security_information->
         retransmission_of_initial_nas_message_request = 1;
+    /* PANIC: K_AMF_change_flag (o K_AMF' já foi derivado, amf_ue_kamf_change) */
+    if (amf_ue->kamf_change)
+        additional_security_information->horizontal_derivation_parameter = 1;
 
     ogs_assert(amf_ue->selected_int_algorithm !=
             OGS_NAS_SECURITY_ALGORITHMS_EIA0);

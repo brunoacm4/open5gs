@@ -29,6 +29,7 @@
 #define FC_FOR_KAMF_DERIVATION                  0x6D
 #define FC_FOR_KGNB_KN3IWF_DERIVATION           0x6E
 #define FC_FOR_NH_GNB_DERIVATION                0x6F
+#define FC_FOR_KAMF_PRIME_DERIVATION            0x72
 
 #define FC_FOR_KASME                            0x10
 #define FC_FOR_KENB_DERIVATION                  0x11
@@ -250,6 +251,31 @@ void ogs_kdf_kgnb_and_kn3iwf(const uint8_t *kamf, uint32_t ul_count,
 
     ogs_kdf_common(kamf, OGS_SHA256_DIGEST_SIZE,
             FC_FOR_KGNB_KN3IWF_DERIVATION, param, kgnb);
+}
+
+/*
+ * TS33.501 Annex A.13 KAMF to KAMF' derivation in mobility
+ * (PANIC: also used to give a restored context a fresh KAMF). In idle mode
+ * mobility, DIRECTION is 0x00 and COUNT is the uplink NAS COUNT used in the
+ * Registration Request; in handover, 0x01 and the downlink NAS COUNT.
+ */
+void ogs_kdf_kamf_prime(const uint8_t *kamf, uint8_t direction,
+        uint32_t count, uint8_t *kamf_prime)
+{
+    kdf_param_t param;
+
+    ogs_assert(kamf);
+    ogs_assert(kamf_prime);
+
+    memset(param, 0, sizeof(param));
+    param[0].buf = &direction;
+    param[0].len = 1;
+    count = htobe32(count);
+    param[1].buf = (uint8_t *)&count;
+    param[1].len = 4;
+
+    ogs_kdf_common(kamf, OGS_SHA256_DIGEST_SIZE,
+            FC_FOR_KAMF_PRIME_DERIVATION, param, kamf_prime);
 }
 
 /* TS33.501 Annex A.10 NH derivation function */

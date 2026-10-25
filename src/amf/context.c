@@ -1683,6 +1683,28 @@ void amf_ue_confirm_guti(amf_ue_t *amf_ue)
     amf_persistence_save(amf_ue);
 }
 
+/*
+ * PANIC: contexto persistente (fase 1b). K_AMF novo para um contexto
+ * restaurado, antes de responder à primeira mensagem do UE: derivação
+ * horizontal (TS 33.501 Anexo A.13, como no registo de mobilidade:
+ * DIRECTION 0x00, COUNT = contador de subida da mensagem acabada de
+ * verificar). O Security Mode Command seguinte leva o K_AMF_change_flag; as
+ * chaves NAS derivam-se do K_AMF' ao construí-lo e os contadores voltam a 0
+ * (contexto novo). Assim nunca se repete um contador com a chave antiga.
+ */
+void amf_ue_kamf_change(amf_ue_t *amf_ue)
+{
+    uint8_t kamf_prime[OGS_SHA256_DIGEST_SIZE];
+
+    ogs_assert(amf_ue);
+
+    ogs_kdf_kamf_prime(amf_ue->kamf, 0x00, amf_ue->ul_count.i32, kamf_prime);
+    memcpy(amf_ue->kamf, kamf_prime, OGS_SHA256_DIGEST_SIZE);
+
+    ogs_info("[%s] Restored context: new K_AMF (horizontal derivation, "
+            "UL COUNT %u)", amf_ue->supi, amf_ue->ul_count.i32);
+}
+
 amf_ue_t *amf_ue_add(ran_ue_t *ran_ue)
 {
     amf_gnb_t *gnb = NULL;

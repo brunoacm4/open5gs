@@ -471,8 +471,10 @@ static bool restore_one(const bson_t *doc)
     amf_ue->mac_failed = 0;
     amf_ue->persisted_ul_count = amf_ue->ul_count.i32;
 
-    /* Na primeira mensagem, chave nova (fase 1b, patch 0012) */
+    /* Na primeira mensagem, chave nova (o contador de descida guardado pode
+     * estar atrasado: com a chave antiga repetiria valores) */
     amf_ue->restored = true;
+    amf_ue->kamf_change = true;
 
     /* Registado e em CM-IDLE: o mobile reachable timer corre desde já */
     memset(&e, 0, sizeof(e));

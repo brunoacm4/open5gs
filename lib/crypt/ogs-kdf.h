@@ -77,6 +77,10 @@ void ogs_kdf_kgnb_and_kn3iwf(const uint8_t *kamf, uint32_t ul_count,
 /* TS33.501 Annex A.10 NH derivation function */
 void ogs_kdf_nh_gnb(const uint8_t *kamf, uint8_t *sync_input, uint8_t *kgnb);
 
+/* TS33.501 Annex A.13 KAMF to KAMF' derivation in mobility (PANIC) */
+void ogs_kdf_kamf_prime(const uint8_t *kamf, uint8_t direction,
+        uint32_t count, uint8_t *kamf_prime);
+
 /*
  * TS33.501 Annex C.3.4.1 Profile A
  * TS33.501 Annex C.3.4.2 Profile B

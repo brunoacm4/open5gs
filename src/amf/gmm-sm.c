@@ -1775,6 +1775,14 @@ static void common_register_state(ogs_fsm_t *s, amf_event_t *e,
                  */
                 CLEAR_NG_CONTEXT(amf_ue);
 
+                /* PANIC: contexto restaurado: K_AMF novo antes de continuar;
+                 * o registo retoma no Security Mode Complete */
+                if (amf_ue->kamf_change) {
+                    amf_ue_kamf_change(amf_ue);
+                    OGS_FSM_TRAN(s, &gmm_state_security_mode);
+                    break;
+                }
+
                 gmm_cause = gmm_handle_registration_update(
                         ran_ue, amf_ue, &nas_message->gmm.registration_request);
                 if (gmm_cause != OGS_5GMM_CAUSE_REQUEST_ACCEPTED) {
@@ -1801,7 +1809,10 @@ static void common_register_state(ogs_fsm_t *s, amf_event_t *e,
                         break;
                     }
 
-                    if (!UDM_SDM_SUBSCRIBED(amf_ue)) {
+                    /* PANIC: num contexto restaurado não se recriam a
+                     * subscrição no UDM nem a política no PCF (decisão 2 da
+                     * fase 1b: só quando forem precisas, no registo inicial) */
+                    if (!UDM_SDM_SUBSCRIBED(amf_ue) && !amf_ue->restored) {
                         r = amf_ue_sbi_discover_and_send(
                                 OpenAPI_service_name_nudm_uecm, NULL,
                                 amf_nudm_uecm_build_registration,
@@ -1810,7 +1821,8 @@ static void common_register_state(ogs_fsm_t *s, amf_event_t *e,
                         ogs_assert(r != OGS_ERROR);
                         OGS_FSM_TRAN(s, &gmm_state_initial_context_setup);
                         break;
-                    } else if (!PCF_AM_POLICY_ASSOCIATED(amf_ue)) {
+                    } else if (!PCF_AM_POLICY_ASSOCIATED(amf_ue) &&
+                            !amf_ue->restored) {
                         r = amf_ue_sbi_discover_and_send(
                                 OpenAPI_service_name_npcf_am_policy_control,
                                 NULL,
@@ -1911,6 +1923,14 @@ static void common_register_state(ogs_fsm_t *s, amf_event_t *e,
              * the UEContextReleaseCommand/Complete with the gNB
              */
             CLEAR_NG_CONTEXT(amf_ue);
+
+            /* PANIC: contexto restaurado: K_AMF novo antes de continuar;
+             * o Service Request retoma no Security Mode Complete */
+            if (amf_ue->kamf_change) {
+                amf_ue_kamf_change(amf_ue);
+                OGS_FSM_TRAN(s, &gmm_state_security_mode);
+                break;
+            }
 
             gmm_cause = gmm_handle_service_update(
                     ran_ue, amf_ue, &nas_message->gmm.service_request);
@@ -2532,7 +2552,7 @@ void gmm_state_authentication(ogs_fsm_t *s, amf_event_t *e)
 
 void gmm_state_security_mode(ogs_fsm_t *s, amf_event_t *e)
 {
-    int r;
+    int r, xact_count = 0;
     ogs_nas_5gmm_cause_t gmm_cause;
     amf_ue_t *amf_ue = NULL;
     ran_ue_t *ran_ue = NULL;
@@ -2615,6 +2635,21 @@ void gmm_state_security_mode(ogs_fsm_t *s, amf_event_t *e)
 
             CLEAR_AMF_UE_TIMER(amf_ue->t3560);
 
+            /*
+             * PANIC: contexto restaurado com K_AMF novo. A mensagem inicial
+             * (no contentor) é tratada já a seguir como a de um UE conhecido,
+             * e o Service Request pode mandar logo o Initial Context Setup:
+             * o KgNB tem de vir já do K_AMF novo.
+             */
+            if (amf_ue->kamf_change) {
+                xact_count = amf_sess_xact_count(amf_ue);
+                ogs_kdf_kgnb_and_kn3iwf(
+                        amf_ue->kamf, amf_ue->ul_count.i32,
+                        amf_ue->nas.access_type, amf_ue->kgnb);
+                ogs_kdf_nh_gnb(amf_ue->kamf, amf_ue->kgnb, amf_ue->nh);
+                amf_ue->nhcc = 1;
+            }
+
             gmm_cause = gmm_handle_security_mode_complete(
                     amf_ue, &nas_message->gmm.security_mode_complete);
             if (gmm_cause != OGS_5GMM_CAUSE_REQUEST_ACCEPTED) {
@@ -2627,6 +2662,47 @@ void gmm_state_security_mode(ogs_fsm_t *s, amf_event_t *e)
                 OGS_FSM_TRAN(s, gmm_state_exception);
                 break;
             }
+
+            /*
+             * PANIC: retomar o registo periódico ou o Service Request como num
+             * UE conhecido: sem registo no UDM nem os pedidos do registo
+             * inicial (como no estado registado, common_register_state).
+             */
+            if (amf_ue->kamf_change) {
+                amf_ue->kamf_change = false;
+                amf_persistence_save(amf_ue);
+
+                if (amf_ue->nas.message_type ==
+                        OGS_NAS_5GS_REGISTRATION_REQUEST) {
+                    if (amf_sess_xact_count(amf_ue) == xact_count) {
+                        if (amf_update_allowed_nssai(amf_ue) == false) {
+                            ogs_error("No Allowed-NSSAI");
+                            r = nas_5gs_send_gmm_reject(
+                                    ran_ue, amf_ue,
+                                    OGS_5GMM_CAUSE_NO_NETWORK_SLICES_AVAILABLE);
+                            ogs_expect(r == OGS_OK);
+                            ogs_assert(r != OGS_ERROR);
+                            OGS_FSM_TRAN(s, gmm_state_exception);
+                            break;
+                        }
+                        CLEAR_AMF_UE_TIMER(amf_ue->t3550);
+                        r = nas_5gs_send_registration_accept(amf_ue);
+                        ogs_expect(r == OGS_OK);
+                        ogs_assert(r != OGS_ERROR);
+                    }
+                    if (amf_ue->next.m_tmsi)
+                        OGS_FSM_TRAN(s, &gmm_state_initial_context_setup);
+                    else
+                        OGS_FSM_TRAN(s, &gmm_state_registered);
+                } else {
+                    OGS_FSM_TRAN(s, &gmm_state_registered);
+                }
+                break;
+            }
+
+            /* PANIC: autenticação e contexto novos: daqui em diante o UE
+             * volta a ter subscrição no UDM e política no PCF */
+            amf_ue->restored = false;
 
             if (amf_ue->amf_ue_context_transfer_state ==
                     UE_CONTEXT_TRANSFER_NEW_AMF_STATE) {
@@ -3532,6 +3608,14 @@ void gmm_state_exception(ogs_fsm_t *s, amf_event_t *e)
                  * the UEContextReleaseCommand/Complete with the gNB
                  */
                 CLEAR_NG_CONTEXT(amf_ue);
+
+                /* PANIC: contexto restaurado: K_AMF novo antes de continuar;
+                 * o registo retoma no Security Mode Complete */
+                if (amf_ue->kamf_change) {
+                    amf_ue_kamf_change(amf_ue);
+                    OGS_FSM_TRAN(s, &gmm_state_security_mode);
+                    break;
+                }
 
                 gmm_cause = gmm_handle_registration_update(
                         ran_ue, amf_ue, &nas_message->gmm.registration_request);

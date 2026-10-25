@@ -706,11 +706,15 @@ struct amf_ue_s {
 
     /*
      * PANIC: contexto persistente (fase 1b). restored: o contexto veio da base
-     * de dados no arranque (a primeira mensagem do UE leva a chave nova);
-     * persisted_ul_count: o último contador de subida gravado.
+     * de dados no arranque, sem subscrição no UDM nem política no PCF (só se
+     * recriam num registo inicial); persisted_ul_count: o último contador de
+     * subida gravado; kamf_change: a próxima mensagem do UE leva um Security
+     * Mode Command com K_AMF novo (TS 33.501 6.7.2 e Anexo A.13), para não
+     * repetir contadores NAS com a chave antiga.
      */
     bool restored;
     uint32_t persisted_ul_count;
+    bool kamf_change;
 
     /* UE Radio Capability */
     OCTET_STRING_t  ueRadioCapability;
@@ -1077,6 +1081,7 @@ ran_ue_t *ran_ue_find_by_id(ogs_pool_id_t id);
 
 void amf_ue_new_guti(amf_ue_t *amf_ue);
 void amf_ue_confirm_guti(amf_ue_t *amf_ue);
+void amf_ue_kamf_change(amf_ue_t *amf_ue);
 
 amf_ue_t *amf_ue_add(ran_ue_t *ran_ue);
 ogs_time_t amf_ue_implicit_deregistration_duration(amf_ue_t *amf_ue);
