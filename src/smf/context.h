@@ -155,6 +155,15 @@ typedef struct smf_context_s {
         const char *maximum_integrity_protected_data_rate_downlink;
     } security_indication;
 
+    /*
+     * PANIC: when the AMF says the UE is not reachable (or paging failed),
+     * tell the UPF to drop the buffered downlink packets (PFCP DROBU), so the
+     * next packet is reported again instead of the session staying silent.
+     */
+    struct {
+        bool drop_when_unreachable;
+    } dl_buffering;
+
 #define SMF_UE_IS_LAST_SESSION(__sMF) \
      ((__sMF) && (ogs_list_count(&(__sMF)->sess_list)) == 1)
     ogs_list_t      smf_ue_list;

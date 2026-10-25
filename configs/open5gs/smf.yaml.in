@@ -50,6 +50,9 @@ smf:
 #    - ::1
 #  ctf:
 #    enabled: auto   # auto(default)|yes|no
+#  dl_buffering:                 # PANIC: UE not reachable or paging failed: tell
+#    drop_when_unreachable: true # the UPF to drop the buffered DL packets (PFCP
+#                                # DROBU); default false (Open5GS)
   freeDiameter: @sysconfdir@/freeDiameter/smf.conf
 
 ################################################################################

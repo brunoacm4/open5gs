@@ -649,6 +649,35 @@ int smf_5gc_pfcp_send_all_pdr_modification_request(
     return rv;
 }
 
+/*
+ * PANIC: the UE is not reachable, tell the UPF to drop the buffered downlink
+ * packets (DROBU). No SBI stream waits for the answer.
+ */
+int smf_5gc_pfcp_send_drop_buffered_request(smf_sess_t *sess)
+{
+    int rv;
+    ogs_pfcp_xact_t *xact = NULL;
+
+    ogs_assert(sess);
+
+    xact = ogs_pfcp_xact_local_create(
+            sess->pfcp_node, sess_5gc_timeout, OGS_UINT_TO_POINTER(sess->id));
+    if (!xact) {
+        ogs_error("ogs_pfcp_xact_local_create() failed");
+        return OGS_ERROR;
+    }
+
+    xact->local_seid = sess->smf_n4_seid;
+    xact->modify_flags =
+        OGS_PFCP_MODIFY_SESSION | OGS_PFCP_MODIFY_DROP_BUFFERED;
+
+    rv = smf_pfcp_send_modify_list(
+            sess, smf_n4_build_drop_buffered_request, xact, 0);
+    ogs_expect(rv == OGS_OK);
+
+    return rv;
+}
+
 int smf_5gc_pfcp_send_qos_flow_list_modification_request(
         smf_sess_t *sess, ogs_sbi_stream_t *stream,
         uint64_t flags, ogs_time_t duration)

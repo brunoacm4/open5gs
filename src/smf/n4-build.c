@@ -351,6 +351,42 @@ ogs_pkbuf_t *smf_n4_build_pdr_to_modify_list(
     return pkbuf;
 }
 
+/* PANIC: Session Modification with only PFCPSMReq-Flags DROBU */
+ogs_pkbuf_t *smf_n4_build_drop_buffered_request(
+        uint8_t type, smf_sess_t *sess, ogs_pfcp_xact_t *xact)
+{
+    ogs_pfcp_message_t *pfcp_message = NULL;
+    ogs_pfcp_session_modification_request_t *req = NULL;
+    ogs_pfcp_smreq_flags_t smreq_flags;
+    ogs_pkbuf_t *pkbuf = NULL;
+
+    ogs_debug("Session Modification Request [DROBU]");
+    ogs_assert(sess);
+    ogs_assert(xact);
+    ogs_assert(xact->modify_flags & OGS_PFCP_MODIFY_DROP_BUFFERED);
+
+    pfcp_message = ogs_calloc(1, sizeof(*pfcp_message));
+    if (!pfcp_message) {
+        ogs_error("ogs_calloc() failed");
+        return NULL;
+    }
+
+    req = &pfcp_message->pfcp_session_modification_request;
+
+    smreq_flags.value = 0;
+    smreq_flags.drop_buffered_packets = 1;
+    req->pfcpsmreq_flags.presence = 1;
+    req->pfcpsmreq_flags.u8 = smreq_flags.value;
+
+    pfcp_message->h.type = type;
+    pkbuf = ogs_pfcp_build_msg(pfcp_message);
+    ogs_expect(pkbuf);
+
+    ogs_free(pfcp_message);
+
+    return pkbuf;
+}
+
 ogs_pkbuf_t *smf_n4_build_qos_flow_to_modify_list(
         uint8_t type, smf_sess_t *sess, ogs_pfcp_xact_t *xact)
 {

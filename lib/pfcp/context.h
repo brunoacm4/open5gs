@@ -471,6 +471,7 @@ ogs_pfcp_far_t *ogs_pfcp_far_find_by_teid(uint32_t teid);
 
 void ogs_pfcp_far_remove(ogs_pfcp_far_t *far);
 void ogs_pfcp_far_remove_all(ogs_pfcp_sess_t *sess);
+int ogs_pfcp_far_drop_buffered(ogs_pfcp_far_t *far);
 
 ogs_pfcp_urr_t *ogs_pfcp_urr_add(ogs_pfcp_sess_t *sess);
 ogs_pfcp_urr_t *ogs_pfcp_urr_find(

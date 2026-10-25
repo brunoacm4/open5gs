@@ -19,6 +19,7 @@
 
 #include "sbi-path.h"
 #include "ngap-path.h"
+#include "pfcp-path.h"
 #include "binding.h"
 #include "namf-handler.h"
 
@@ -56,6 +57,21 @@ bool smf_namf_comm_handle_n1_n2_message_transfer(
 
     case SMF_NETWORK_TRIGGERED_SERVICE_REQUEST:
     case SMF_NETWORK_REQUESTED_QOS_FLOW_MODIFICATION:
+        /*
+         * PANIC: TS 23.502 4.2.3.3 step 3c. The AMF answered "UE not
+         * reachable" (no paging): tell the UPF to drop the buffered packets.
+         */
+        if (smf_self()->dl_buffering.drop_when_unreachable &&
+            recvmsg->res_status >= 300 &&
+            recvmsg->ProblemDetails && recvmsg->ProblemDetails->cause &&
+            !strcmp(recvmsg->ProblemDetails->cause,
+                OGS_SBI_APP_STRERROR_UE_NOT_REACHABLE)) {
+            ogs_warn("[%s:%d] UE not reachable: drop buffered packets",
+                    smf_ue->supi, sess->psi);
+            ogs_expect(OGS_OK == smf_5gc_pfcp_send_drop_buffered_request(sess));
+            break;
+        }
+
         N1N2MessageTransferRspData = recvmsg->N1N2MessageTransferRspData;
         if (!N1N2MessageTransferRspData) {
             ogs_error("No N1N2MessageTransferRspData [status:%d]",
@@ -283,6 +299,17 @@ bool smf_namf_comm_handle_n1_n2_message_transfer_failure_notify(
      *
      * Procedure for pause of charging at SMF is specified in clause 4.4.4.
      */
+
+    /* PANIC: paging failed, tell the UPF to drop the buffered packets */
+    if (smf_self()->dl_buffering.drop_when_unreachable &&
+        (N1N2MsgTxfrFailureNotification->cause ==
+            OpenAPI_n1_n2_message_transfer_cause_UE_NOT_RESPONDING ||
+         N1N2MsgTxfrFailureNotification->cause ==
+            OpenAPI_n1_n2_message_transfer_cause_UE_NOT_REACHABLE_FOR_SESSION)) {
+        ogs_warn("[%d] Paging failed [cause:%d]: drop buffered packets",
+                sess->psi, N1N2MsgTxfrFailureNotification->cause);
+        ogs_expect(OGS_OK == smf_5gc_pfcp_send_drop_buffered_request(sess));
+    }
 
     ogs_assert(true == ogs_sbi_send_http_status_no_content(stream));
     return true;

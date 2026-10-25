@@ -1925,6 +1925,25 @@ void ogs_pfcp_far_remove_all(ogs_pfcp_sess_t *sess)
         ogs_pfcp_far_remove(far);
 }
 
+/*
+ * PANIC: DROBU (TS 29.244 7.5.4, PFCPSMReq-Flags). Drop the downlink packets
+ * buffered in a FAR, keeping its Apply Action: with an empty buffer, the next
+ * packet is reported again (Downlink Data Report). Returns how many were dropped.
+ */
+int ogs_pfcp_far_drop_buffered(ogs_pfcp_far_t *far)
+{
+    int i, n;
+
+    ogs_assert(far);
+
+    n = far->num_of_buffered_gtpu;
+    for (i = 0; i < n; i++)
+        ogs_pkbuf_free(far->buffered_gtpu[i]);
+    far->num_of_buffered_gtpu = 0;
+
+    return n;
+}
+
 ogs_pfcp_urr_t *ogs_pfcp_urr_add(ogs_pfcp_sess_t *sess)
 {
     ogs_pfcp_urr_t *urr = NULL;

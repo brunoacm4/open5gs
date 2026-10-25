@@ -400,6 +400,12 @@ void smf_5gc_n4_handle_session_modification_response(
 
     ogs_assert(sess);
 
+    /* PANIC: DROBU answer, nothing else changed in the session */
+    if (flags & OGS_PFCP_MODIFY_DROP_BUFFERED) {
+        ogs_debug("Session Modification Response [DROBU]");
+        return;
+    }
+
     if (sess->local_ul_addr == NULL && sess->local_ul_addr6 == NULL) {
         if (stream)
             smf_sbi_send_sm_context_update_error_log(

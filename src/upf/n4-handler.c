@@ -266,6 +266,26 @@ void upf_n4_handle_session_modification_request(
         return;
     }
 
+    /*
+     * PANIC: DROBU (TS 29.244 7.5.4): drop the buffered packets before
+     * applying the rest of the request. The SMF sends it when the UE is not
+     * reachable, so stale packets are not delivered later and the next
+     * packet is reported again.
+     */
+    if (req->pfcpsmreq_flags.presence == 1) {
+        ogs_pfcp_smreq_flags_t smreq_flags;
+
+        smreq_flags.value = req->pfcpsmreq_flags.u8;
+        if (smreq_flags.drop_buffered_packets) {
+            int dropped = 0;
+
+            ogs_list_for_each(&sess->pfcp.far_list, far)
+                dropped += ogs_pfcp_far_drop_buffered(far);
+            ogs_info("[DROBU] UP F-SEID[0x%lx] %d buffered packets dropped",
+                    (long)sess->upf_n4_seid, dropped);
+        }
+    }
+
     for (i = 0; i < OGS_MAX_NUM_OF_PDR; i++) {
         created_pdr[i] = ogs_pfcp_handle_create_pdr(&sess->pfcp,
                 &req->create_pdr[i], NULL, &cause_value, &offending_ie_value);

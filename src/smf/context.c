@@ -165,6 +165,8 @@ static int smf_context_prepare(void)
     self.diam_config->cnf_port = DIAMETER_PORT;
     self.diam_config->cnf_port_tls = DIAMETER_SECURE_PORT;
 
+    self.dl_buffering.drop_when_unreachable = false;
+
     return OGS_OK;
 }
 
@@ -985,6 +987,21 @@ int smf_context_parse_config(void)
                                     ogs_yaml_iter_value(
                                             &security_indication_iter);
                         }
+                    }
+                } else if (!strcmp(smf_key, "dl_buffering")) {
+                    /* PANIC: smf.dl_buffering.drop_when_unreachable */
+                    ogs_yaml_iter_t dl_buffering_iter;
+                    ogs_yaml_iter_recurse(&smf_iter, &dl_buffering_iter);
+                    while (ogs_yaml_iter_next(&dl_buffering_iter)) {
+                        const char *dl_buffering_key =
+                            ogs_yaml_iter_key(&dl_buffering_iter);
+                        ogs_assert(dl_buffering_key);
+                        if (!strcmp(dl_buffering_key,
+                                    "drop_when_unreachable")) {
+                            self.dl_buffering.drop_when_unreachable =
+                                ogs_yaml_iter_bool(&dl_buffering_iter);
+                        } else
+                            ogs_warn("unknown key `%s`", dl_buffering_key);
                     }
                 } else if (!strcmp(smf_key, "pfcp")) {
                     /* handle config in pfcp library */
