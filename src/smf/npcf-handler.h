@@ -28,6 +28,7 @@ extern "C" {
 
 bool smf_npcf_smpolicycontrol_handle_create(
         smf_sess_t *sess, ogs_sbi_stream_t *stream, ogs_sbi_message_t *recvmsg);
+void smf_sess_build_default_rules(smf_sess_t *sess);
 bool smf_npcf_smpolicycontrol_handle_update_notify(
         smf_sess_t *sess, ogs_sbi_stream_t *stream, ogs_sbi_message_t *recvmsg);
 bool smf_npcf_smpolicycontrol_handle_terminate_notify(

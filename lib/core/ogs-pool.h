@@ -183,6 +183,17 @@ typedef int32_t ogs_pool_id_t;
     } \
 } while (0)
 
+/* PANIC: ogs_pool_id_calloc() of a specific element (see ogs_pool_alloc_node) */
+#define ogs_pool_id_calloc_node(pool, node, target) do { \
+    ogs_pool_alloc_node(pool, node, target); \
+    if (*node) { \
+        memset(*(node), 0, sizeof(**(node))); \
+        (*(node))->id = OGS_NEXT_ID((pool)->id, 1, OGS_MAX_POOL_ID); \
+        ogs_hash_set((pool)->id_hash, \
+                &((*(node))->id), sizeof(ogs_pool_id_t), *(node)); \
+    } \
+} while (0)
+
 #define ogs_pool_id_free(pool, node) do { \
     ogs_assert(((node)->id) >= OGS_MIN_POOL_ID && \
             ((node)->id) <= OGS_MAX_POOL_ID); \

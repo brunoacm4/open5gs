@@ -472,6 +472,13 @@ typedef struct smf_sess_s {
      */
     bool udm_registered;
 
+    /*
+     * PANIC: persistent context (phase 1b). The session was rebuilt from the
+     * database at start-up and its N4 session is not yet re-created in the
+     * UPF (done when the PFCP association comes up).
+     */
+    bool restored;
+
     /* Serving PLMN ID & Home PLMN ID */
     ogs_plmn_id_t serving_plmn_id;
     ogs_plmn_id_t home_plmn_id;
@@ -764,6 +771,7 @@ smf_sess_t *smf_sess_add_by_apn(smf_ue_t *smf_ue, char *apn, uint8_t rat_type);
 smf_sess_t *smf_sess_add_by_sm_context(ogs_sbi_message_t *message);
 smf_sess_t *smf_sess_add_by_pdu_session(ogs_sbi_message_t *message);
 smf_sess_t *smf_sess_add_by_psi(smf_ue_t *smf_ue, uint8_t psi);
+smf_sess_t *smf_sess_add_restored(smf_ue_t *smf_ue, uint8_t psi, int index);
 
 void smf_sess_select_upf(smf_sess_t *sess);
 uint8_t smf_sess_set_ue_ip(smf_sess_t *sess);

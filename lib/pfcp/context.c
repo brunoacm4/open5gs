@@ -2368,6 +2368,49 @@ ogs_pfcp_ue_ip_t *ogs_pfcp_ue_ip_alloc(
     return ue_ip;
 }
 
+/*
+ * PANIC: persistent context (phase 1b). Take from the dynamic pool the
+ * address a restored session already had, so it is not given to another
+ * session (the subnet is chosen as in ogs_pfcp_ue_ip_alloc). NULL if the
+ * address is not free in that pool.
+ */
+ogs_pfcp_ue_ip_t *ogs_pfcp_ue_ip_reserve(
+        int family, const char *dnn, const uint8_t *addr)
+{
+    ogs_pfcp_subnet_t *subnet = NULL;
+    ogs_pfcp_ue_ip_t *ue_ip = NULL;
+    size_t maxbytes = 0;
+    int i;
+
+    ogs_assert(addr);
+
+    if (family == AF_INET)
+        maxbytes = 4;
+    else if (family == AF_INET6)
+        maxbytes = 16;
+    else
+        return NULL;
+
+    if (dnn)
+        subnet = ogs_pfcp_find_subnet_by_dnn(family, dnn);
+    else
+        subnet = ogs_pfcp_find_subnet(family);
+    if (subnet == NULL)
+        return NULL;
+
+    for (i = 0; i < ogs_pool_size(&subnet->pool); i++) {
+        if (memcmp(subnet->pool.array[i].addr, addr, maxbytes) == 0) {
+            ogs_pool_alloc_node(
+                    &subnet->pool, &ue_ip, &subnet->pool.array[i]);
+            break;
+        }
+    }
+    if (ue_ip)
+        ue_ip->subnet = subnet;
+
+    return ue_ip;
+}
+
 void ogs_pfcp_ue_ip_free(ogs_pfcp_ue_ip_t *ue_ip)
 {
     ogs_pfcp_subnet_t *subnet = NULL;

@@ -26,6 +26,7 @@
 #include "ogs-metrics.h"
 #include "metrics/prometheus/json_pager.h"
 #include "pdu-info.h"
+#include "persistence.h"
 
 static ogs_thread_t *thread;
 static void smf_main(void *data);
@@ -88,6 +89,11 @@ int smf_initialize(void)
 
     ogs_metrics_context_open(ogs_metrics_self());
 
+    /* PANIC: persistent context. Rebuild the sessions before the PFCP
+     * association (their N4 sessions are re-created when it comes up) */
+    rv = smf_persistence_restore();
+    if (rv != OGS_OK) return rv;
+
     rv = smf_fd_init();
     if (rv != 0) return OGS_ERROR;
 
@@ -138,6 +144,10 @@ static void event_termination(void)
 void smf_terminate(void)
 {
     if (!initialized) return;
+
+    /* PANIC: persistent context. Shutdown removes the sessions from RAM but
+     * does not release them: leave the database alone from here on */
+    smf_persistence_stop();
 
     /* Daemon terminating */
     event_termination();

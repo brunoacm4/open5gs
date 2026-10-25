@@ -20,6 +20,7 @@
 #include "context.h"
 #include "gtp-path.h"
 #include "pfcp-path.h"
+#include "persistence.h"
 
 static smf_context_t self;
 static ogs_diam_config_t g_diam_conf;
@@ -1719,7 +1720,12 @@ smf_sess_t *smf_sess_add_by_gtp2_message(ogs_gtp2_message_t *message)
     return sess;
 }
 
-smf_sess_t *smf_sess_add_by_psi(smf_ue_t *smf_ue, uint8_t psi)
+/*
+ * PANIC: index > 0 reserva esse lugar do pool (sessão restaurada do contexto
+ * persistente: o índice é o sm_context_ref que o AMF guardou). 0 = o
+ * comportamento de sempre.
+ */
+static smf_sess_t *sess_add_by_psi(smf_ue_t *smf_ue, uint8_t psi, int index)
 {
     smf_event_t e;
 
@@ -1728,11 +1734,24 @@ smf_sess_t *smf_sess_add_by_psi(smf_ue_t *smf_ue, uint8_t psi)
     ogs_assert(smf_ue);
     ogs_assert(psi != OGS_NAS_PDU_SESSION_IDENTITY_UNASSIGNED);
 
-    ogs_pool_id_calloc(&smf_sess_pool, &sess);
-    if (!sess) {
-        ogs_error("Maximum number of session[%lld] reached",
-            (long long)ogs_app()->pool.sess);
-        return NULL;
+    if (index > 0) {
+        if (index > ogs_pool_size(&smf_sess_pool)) {
+            ogs_error("Invalid session index[%d]", index);
+            return NULL;
+        }
+        ogs_pool_id_calloc_node(&smf_sess_pool, &sess,
+                &smf_sess_pool.array[index - 1]);
+        if (!sess) {
+            ogs_error("Session index[%d] is not available", index);
+            return NULL;
+        }
+    } else {
+        ogs_pool_id_calloc(&smf_sess_pool, &sess);
+        if (!sess) {
+            ogs_error("Maximum number of session[%lld] reached",
+                (long long)ogs_app()->pool.sess);
+            return NULL;
+        }
     }
 
     /* SBI Features */
@@ -1791,6 +1810,18 @@ smf_sess_t *smf_sess_add_by_psi(smf_ue_t *smf_ue, uint8_t psi)
     stats_add_smf_session();
 
     return sess;
+}
+
+smf_sess_t *smf_sess_add_by_psi(smf_ue_t *smf_ue, uint8_t psi)
+{
+    return sess_add_by_psi(smf_ue, psi, 0);
+}
+
+/* PANIC: contexto persistente. Sessão restaurada no mesmo índice */
+smf_sess_t *smf_sess_add_restored(smf_ue_t *smf_ue, uint8_t psi, int index)
+{
+    ogs_assert(index > 0);
+    return sess_add_by_psi(smf_ue, psi, index);
 }
 
 smf_sess_t *smf_sess_add_by_sm_context(ogs_sbi_message_t *message)
@@ -2073,6 +2104,9 @@ void smf_sess_remove(smf_sess_t *sess)
             sess->session.name, sess->psi,
             sess->ipv4 ? OGS_INET_NTOP(&sess->ipv4->addr, buf1) : "",
             sess->ipv6 ? OGS_INET6_NTOP(&sess->ipv6->addr, buf2) : "");
+
+    /* PANIC: persistent context. Session released (not on shutdown) */
+    smf_persistence_delete(sess);
 
     ogs_list_remove(&smf_ue->sess_list, sess);
 

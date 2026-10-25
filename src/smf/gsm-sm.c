@@ -36,6 +36,7 @@
 #include "ngap-path.h"
 #include "fd-path.h"
 #include "local-path.h"
+#include "persistence.h"
 
 static uint8_t gtp_cause_from_diameter(uint8_t gtp_version,
         const uint32_t dia_err, const uint32_t *dia_exp_err)
@@ -963,6 +964,8 @@ void smf_gsm_state_operational(ogs_fsm_t *s, smf_event_t *e)
 
     switch (e->h.id) {
     case OGS_FSM_ENTRY_SIG:
+        /* PANIC: persistent context. The session is established */
+        smf_persistence_save(sess);
         break;
 
     case OGS_FSM_EXIT_SIG:
@@ -1025,6 +1028,18 @@ void smf_gsm_state_operational(ogs_fsm_t *s, smf_event_t *e)
 
         switch (pfcp_message->h.type) {
         case OGS_PFCP_SESSION_ESTABLISHMENT_RESPONSE_TYPE:
+            /* PANIC: session restored from the persistent context: the UPF
+             * chose new TEIDs, read them as in a normal establishment */
+            if (sess->restored) {
+                sess->restored = false;
+                pfcp_cause = smf_5gc_n4_handle_session_establishment_response(
+                        sess, pfcp_xact,
+                        &pfcp_message->pfcp_session_establishment_response);
+                if (pfcp_cause != OGS_PFCP_CAUSE_REQUEST_ACCEPTED)
+                    ogs_error("[%d:%d] N4 re-creation failed [%d]",
+                            sess->smf_ue_id, sess->psi, pfcp_cause);
+                break;
+            }
             if ((pfcp_xact->create_flags &
                         OGS_PFCP_CREATE_RESTORATION_INDICATION)) {
                 ogs_pfcp_session_establishment_response_t *rsp = NULL;

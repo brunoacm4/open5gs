@@ -321,18 +321,8 @@ bool smf_npcf_smpolicycontrol_handle_create(
         smf_sess_t *sess, ogs_sbi_stream_t *stream, ogs_sbi_message_t *recvmsg)
 {
     int rv;
-    char buf1[OGS_ADDRSTRLEN];
-    char buf2[OGS_ADDRSTRLEN];
 
     smf_ue_t *smf_ue = NULL;
-    smf_bearer_t *qos_flow = NULL;
-    ogs_pfcp_pdr_t *dl_pdr = NULL;
-    ogs_pfcp_pdr_t *ul_pdr = NULL;
-    ogs_pfcp_pdr_t *cp2up_pdr = NULL;
-    ogs_pfcp_pdr_t *up2cp_pdr = NULL;
-    ogs_pfcp_far_t *dl_far = NULL;
-    ogs_pfcp_far_t *up2cp_far = NULL;
-    ogs_pfcp_qer_t *qer = NULL;
 
     OpenAPI_sm_policy_decision_t *SmPolicyDecision = NULL;
     OpenAPI_lnode_t *node = NULL;
@@ -547,6 +537,41 @@ bool smf_npcf_smpolicycontrol_handle_create(
         return false;
     }
 
+    /* PANIC: QoS flow and PFCP rules (also used to restore a session) */
+    smf_sess_build_default_rules(sess);
+
+    ogs_assert(OGS_OK ==
+            smf_5gc_pfcp_send_session_establishment_request(sess, stream, 0));
+
+    return true;
+}
+
+/*
+ * PANIC: default QoS flow and PFCP rules of a 5GC session, from the session
+ * QoS/AMBR, the UE IP address and the features of the associated UPF. Split
+ * out of smf_npcf_smpolicycontrol_handle_create so that a session restored
+ * from the persistent context (phase 1b) gets exactly the same rules.
+ */
+void smf_sess_build_default_rules(smf_sess_t *sess)
+{
+    char buf1[OGS_ADDRSTRLEN];
+    char buf2[OGS_ADDRSTRLEN];
+
+    smf_ue_t *smf_ue = NULL;
+    smf_bearer_t *qos_flow = NULL;
+    ogs_pfcp_pdr_t *dl_pdr = NULL;
+    ogs_pfcp_pdr_t *ul_pdr = NULL;
+    ogs_pfcp_pdr_t *cp2up_pdr = NULL;
+    ogs_pfcp_pdr_t *up2cp_pdr = NULL;
+    ogs_pfcp_far_t *dl_far = NULL;
+    ogs_pfcp_far_t *up2cp_far = NULL;
+    ogs_pfcp_qer_t *qer = NULL;
+
+    ogs_assert(sess);
+    smf_ue = smf_ue_find_by_id(sess->smf_ue_id);
+    ogs_assert(smf_ue);
+    ogs_assert(sess->pfcp_node);
+
     /* Remove all previous QoS flow */
     smf_bearer_remove_all(sess);
 
@@ -747,11 +772,6 @@ bool smf_npcf_smpolicycontrol_handle_create(
 
     cp2up_pdr->precedence = OGS_PFCP_CP2UP_PDR_PRECEDENCE;
     up2cp_pdr->precedence = OGS_PFCP_UP2CP_PDR_PRECEDENCE;
-
-    ogs_assert(OGS_OK ==
-            smf_5gc_pfcp_send_session_establishment_request(sess, stream, 0));
-
-    return true;
 }
 
 bool smf_npcf_smpolicycontrol_handle_update_notify(

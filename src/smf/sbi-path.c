@@ -255,8 +255,11 @@ ogs_sbi_xact_t *smf_namf_comm_create_n1_n2_message_xact(
 
     discovery_option = ogs_sbi_discovery_option_new();
     ogs_assert(discovery_option);
-    ogs_sbi_discovery_option_set_target_nf_instance_id(
-            discovery_option, sess->amf_nf_id);
+    /* PANIC: a session restored from the persistent context has no serving
+     * AMF instance id (it changes on every start): discovery finds the AMF */
+    if (sess->amf_nf_id)
+        ogs_sbi_discovery_option_set_target_nf_instance_id(
+                discovery_option, sess->amf_nf_id);
 
     xact = ogs_sbi_xact_add(
             sess->id, &sess->sbi, OpenAPI_service_name_namf_comm,

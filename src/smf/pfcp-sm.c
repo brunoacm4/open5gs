@@ -22,6 +22,7 @@
 #include "local-path.h"
 
 #include "n4-handler.h"
+#include "persistence.h"
 
 static void pfcp_restoration(ogs_pfcp_node_t *node);
 static void reselect_upf(ogs_pfcp_node_t *node);
@@ -198,6 +199,10 @@ void smf_pfcp_state_associated(ogs_fsm_t *s, smf_event_t *e)
             node->restoration_required = false;
             ogs_error("PFCP restoration");
         }
+
+        /* PANIC: persistent context. Re-create the N4 sessions restored
+         * from the database (no-op if there are none) */
+        smf_persistence_reestablish(node);
 
         smf_metrics_inst_global_inc(SMF_METR_GLOB_GAUGE_PFCP_PEERS_ACTIVE);
         break;
