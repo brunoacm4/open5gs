@@ -140,6 +140,26 @@ typedef int32_t ogs_pool_id_t;
     } \
 } while (0)
 
+/*
+ * PANIC: allocate a specific free element ('target', a pointer into
+ * (pool)->array), e.g. to give back an identifier that must keep its value
+ * after a restart. The element is swapped to the head of the free ring and
+ * taken with ogs_pool_alloc(). *(node) is NULL if 'target' is not free.
+ */
+#define ogs_pool_alloc_node(pool, node, target) do { \
+    int __i, __k; \
+    *(node) = NULL; \
+    for (__i = 0; __i < (pool)->avail; __i++) { \
+        __k = ((pool)->head + __i) % ((pool)->size); \
+        if ((pool)->free[__k] == (target)) { \
+            (pool)->free[__k] = (pool)->free[(pool)->head]; \
+            (pool)->free[(pool)->head] = (target); \
+            ogs_pool_alloc(pool, node); \
+            break; \
+        } \
+    } \
+} while (0)
+
 #define ogs_pool_free(pool, node) do { \
     if ((pool)->avail < (pool)->size) { \
         (pool)->avail++; \

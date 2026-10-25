@@ -54,6 +54,8 @@ void amf_context_init(void)
     ogs_log_install_domain(&__ogs_nas_domain, "nas", ogs_core()->log.level);
     ogs_log_install_domain(&__amf_log_domain, "amf", ogs_core()->log.level);
     ogs_log_install_domain(&__gmm_log_domain, "gmm", ogs_core()->log.level);
+    /* PANIC: contexto persistente (libogsdbi) */
+    ogs_log_install_domain(&__ogs_dbi_domain, "dbi", ogs_core()->log.level);
 
     ogs_list_init(&self.ngap_list);
     ogs_list_init(&self.ngap_list6);
@@ -136,6 +138,9 @@ static int amf_context_prepare(void)
 
     /* PANIC: UE inalcançável continua a ser chamado (como no Open5GS) */
     self.reachability.reject_when_unreachable = false;
+
+    /* PANIC: sem contexto persistente (como no Open5GS) */
+    self.persistence.enabled = false;
 
     return OGS_OK;
 }
@@ -1144,6 +1149,22 @@ int amf_context_parse_config(void)
                                 ogs_yaml_iter_bool(&reach_iter);
                         else
                             ogs_warn("unknown key `%s`", reach_key);
+                    }
+                } else if (!strcmp(amf_key, "persistence")) {
+                    /* PANIC: contexto persistente (fase 1b) */
+                    ogs_yaml_iter_t pers_iter;
+                    ogs_yaml_iter_recurse(&amf_iter, &pers_iter);
+
+                    while (ogs_yaml_iter_next(&pers_iter)) {
+                        const char *pers_key =
+                            ogs_yaml_iter_key(&pers_iter);
+                        ogs_assert(pers_key);
+
+                        if (!strcmp(pers_key, "enabled"))
+                            self.persistence.enabled =
+                                ogs_yaml_iter_bool(&pers_iter);
+                        else
+                            ogs_warn("unknown key `%s`", pers_key);
                     }
                 } else if (!strcmp(amf_key, "default")) {
                     /* handle config in sbi library */

@@ -32,6 +32,7 @@
 #include "ogs-app.h"
 #include "ogs-ngap.h"
 #include "ogs-nas-5gs.h"
+#include "ogs-dbi.h"
 #include "ipfw/ogs-ipfw.h"
 
 #include "timer.h"
@@ -163,6 +164,15 @@ typedef struct smf_context_s {
     struct {
         bool drop_when_unreachable;
     } dl_buffering;
+
+    /*
+     * PANIC: persistent context (phase 1b). When enabled, the SMF stores the
+     * stable part of each PDU session in MongoDB (db_uri) and rebuilds it at
+     * start-up, so sessions (same UE IP) survive a core restart.
+     */
+    struct {
+        bool enabled;
+    } persistence;
 
 #define SMF_UE_IS_LAST_SESSION(__sMF) \
      ((__sMF) && (ogs_list_count(&(__sMF)->sess_list)) == 1)

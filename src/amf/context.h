@@ -24,6 +24,7 @@
 #include "ogs-sbi.h"
 #include "ogs-sctp.h"
 #include "ogs-ngap.h"
+#include "ogs-dbi.h"
 #include "ogs-nas-5gs.h"
 
 #include "amf-sm.h"
@@ -164,6 +165,16 @@ typedef struct amf_context_s {
     struct {
         bool reject_when_unreachable;
     } reachability;
+
+    /*
+     * PANIC: contexto persistente (fase 1b). Com enabled, o AMF guarda no
+     * MongoDB (db_uri) a parte estável do contexto de cada UE registado e
+     * reconstrói-a no arranque, para a frota voltar sem autenticação depois de
+     * um reinício do core.
+     */
+    struct {
+        bool enabled;
+    } persistence;
 
 } amf_context_t;
 

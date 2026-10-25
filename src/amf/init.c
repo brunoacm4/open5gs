@@ -59,6 +59,16 @@ int amf_initialize(void)
     rv = amf_context_nf_info();
     if (rv != OGS_OK) return rv;
 
+    /* PANIC: contexto persistente (fase 1b) no MongoDB de db_uri */
+    if (amf_self()->persistence.enabled) {
+        if (!ogs_app()->db_uri) {
+            ogs_error("amf.persistence.enabled needs db_uri");
+            return OGS_ERROR;
+        }
+        rv = ogs_dbi_init(ogs_app()->db_uri);
+        if (rv != OGS_OK) return rv;
+    }
+
     ogs_metrics_context_open(ogs_metrics_self());
 
     /* dumpers /gnb-info /ue-info */
@@ -116,6 +126,9 @@ void amf_terminate(void)
     amf_sbi_close();
 
     ogs_metrics_context_close(ogs_metrics_self());
+
+    if (amf_self()->persistence.enabled)
+        ogs_dbi_final();
 
     amf_context_final();
     ogs_sbi_context_final();

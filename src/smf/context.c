@@ -82,6 +82,8 @@ void smf_context_init(void)
     ogs_log_install_domain(&__ogs_diam_domain, "diam", ogs_core()->log.level);
     ogs_log_install_domain(&__smf_log_domain, "smf", ogs_core()->log.level);
     ogs_log_install_domain(&__gsm_log_domain, "gsm", ogs_core()->log.level);
+    /* PANIC: persistent context (libogsdbi) */
+    ogs_log_install_domain(&__ogs_dbi_domain, "dbi", ogs_core()->log.level);
 
     ogs_pool_init(&smf_gtp_node_pool, ogs_app()->pool.nf);
     ogs_pool_init(&smf_ue_pool, ogs_global_conf()->max.ue);
@@ -166,6 +168,7 @@ static int smf_context_prepare(void)
     self.diam_config->cnf_port_tls = DIAMETER_SECURE_PORT;
 
     self.dl_buffering.drop_when_unreachable = false;
+    self.persistence.enabled = false;
 
     return OGS_OK;
 }
@@ -1002,6 +1005,20 @@ int smf_context_parse_config(void)
                                 ogs_yaml_iter_bool(&dl_buffering_iter);
                         } else
                             ogs_warn("unknown key `%s`", dl_buffering_key);
+                    }
+                } else if (!strcmp(smf_key, "persistence")) {
+                    /* PANIC: smf.persistence.enabled */
+                    ogs_yaml_iter_t persistence_iter;
+                    ogs_yaml_iter_recurse(&smf_iter, &persistence_iter);
+                    while (ogs_yaml_iter_next(&persistence_iter)) {
+                        const char *persistence_key =
+                            ogs_yaml_iter_key(&persistence_iter);
+                        ogs_assert(persistence_key);
+                        if (!strcmp(persistence_key, "enabled")) {
+                            self.persistence.enabled =
+                                ogs_yaml_iter_bool(&persistence_iter);
+                        } else
+                            ogs_warn("unknown key `%s`", persistence_key);
                     }
                 } else if (!strcmp(smf_key, "pfcp")) {
                     /* handle config in pfcp library */

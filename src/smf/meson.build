@@ -119,7 +119,8 @@ libsmf_sources = files('''
 
 libsmf = static_library('smf',
     sources : libsmf_sources,
-    dependencies : [libmetrics_dep,
+    dependencies : [libdbi_dep,
+                    libmetrics_dep,
                     libsbi_dep,
                     libngap_dep,
                     libnas_5gs_dep,
@@ -131,7 +132,8 @@ libsmf = static_library('smf',
 
 libsmf_dep = declare_dependency(
     link_with : libsmf,
-    dependencies : [libmetrics_dep,
+    dependencies : [libdbi_dep,
+                    libmetrics_dep,
                     libsbi_dep,
                     libngap_dep,
                     libnas_5gs_dep,

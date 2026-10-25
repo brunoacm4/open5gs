@@ -53,6 +53,9 @@ smf:
 #  dl_buffering:                 # PANIC: UE not reachable or paging failed: tell
 #    drop_when_unreachable: true # the UPF to drop the buffered DL packets (PFCP
 #                                # DROBU); default false (Open5GS)
+#  persistence:                  # PANIC: keep the stable part of each PDU session in
+#    enabled: true               # MongoDB (needs db_uri at the top level) and rebuild
+#                                # it at start-up; default false
   freeDiameter: @sysconfdir@/freeDiameter/smf.conf
 
 ################################################################################

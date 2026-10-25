@@ -76,6 +76,16 @@ int smf_initialize(void)
     rv = ogs_pfcp_ue_pool_generate();
     if (rv != OGS_OK) return rv;
 
+    /* PANIC: persistent context (phase 1b) in the MongoDB of db_uri */
+    if (smf_self()->persistence.enabled) {
+        if (!ogs_app()->db_uri) {
+            ogs_error("smf.persistence.enabled needs db_uri");
+            return OGS_ERROR;
+        }
+        rv = ogs_dbi_init(ogs_app()->db_uri);
+        if (rv != OGS_OK) return rv;
+    }
+
     ogs_metrics_context_open(ogs_metrics_self());
 
     rv = smf_fd_init();
@@ -139,6 +149,9 @@ void smf_terminate(void)
     smf_sbi_close();
 
     ogs_metrics_context_close(ogs_metrics_self());
+
+    if (smf_self()->persistence.enabled)
+        ogs_dbi_final();
 
     smf_fd_final();
 

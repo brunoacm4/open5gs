@@ -61,6 +61,9 @@ amf:
 #  reachability:                 # PANIC: N1N2MessageTransfer for an unreachable
 #    reject_when_unreachable: true  # UE (PPF cleared): answer 504 UE_NOT_REACHABLE
 #                                   # instead of paging; default false (Open5GS)
+#  persistence:                  # PANIC: keep the stable part of each registered UE
+#    enabled: true               # context in MongoDB (needs db_uri at the top
+#                                # level) and rebuild it at start-up; default false
 
 ################################################################################
 # SBI Server
