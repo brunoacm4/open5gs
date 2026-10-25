@@ -1055,6 +1055,7 @@ void amf_state_operational(ogs_fsm_t *s, amf_event_t *e)
              */
             CLEAR_AMF_UE_TIMER(amf_ue->mobile_reachable);
             CLEAR_AMF_UE_TIMER(amf_ue->implicit_deregistration);
+            amf_ue->ppf = true; /* PANIC: o UE voltou a contactar a rede */
         }
 
         ogs_assert(amf_ue);

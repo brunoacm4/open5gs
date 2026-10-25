@@ -197,6 +197,7 @@ void gmm_state_de_registered(ogs_fsm_t *s, amf_event_t *e)
              */
 
             ogs_warn("[%s] Mobile Reachable Timer Expired", amf_ue->supi);
+            amf_ue->ppf = false;    /* PANIC: TS 23.501 5.4.1.1, limpar o PPF */
 
             ogs_list_for_each(&amf_ue->sess_list, sess) {
                 if (sess->paging.ongoing == true &&
@@ -1023,6 +1024,7 @@ void gmm_state_registered(ogs_fsm_t *s, amf_event_t *e)
              */
 
             ogs_warn("[%s] Mobile Reachable Timer Expired", amf_ue->supi);
+            amf_ue->ppf = false;    /* PANIC: TS 23.501 5.4.1.1, limpar o PPF */
 
             ogs_list_for_each(&amf_ue->sess_list, sess) {
                 if (sess->paging.ongoing == true &&

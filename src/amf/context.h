@@ -156,6 +156,15 @@ typedef struct amf_context_s {
         } implicit_deregistration;
     } time;
 
+    /*
+     * PANIC: com reject_when_unreachable, um N1N2MessageTransfer para um UE
+     * inalcançável (PPF falso) é respondido "UE not reachable" sem paging
+     * (TS 23.502 4.2.3.3), em vez de o chamar outra vez.
+     */
+    struct {
+        bool reject_when_unreachable;
+    } reachability;
+
 } amf_context_t;
 
 typedef struct amf_gnb_s {
@@ -676,6 +685,13 @@ struct amf_ue_s {
      * Começa no valor global; só muda com amf.time.t3512.dynamic ligado.
      */
     ogs_time_t t3512_value;
+
+    /*
+     * PANIC: Paging Proceed Flag (TS 23.501 5.4.1.1). Fica falso quando expira
+     * o mobile reachable timer (o UE deixou de ser alcançável por paging) e
+     * volta a verdadeiro no contacto seguinte do UE.
+     */
+    bool ppf;
 
     /* UE Radio Capability */
     OCTET_STRING_t  ueRadioCapability;

@@ -58,6 +58,9 @@ amf:
 #    implicit_deregistration:  # PANIC: time after the UE becomes unreachable
 #      value: 86400            # (mobile reachable timer); "never" or 0 = keep it
 #                              # registered; absent = T3512 + 240 s (Open5GS)
+#  reachability:                 # PANIC: N1N2MessageTransfer for an unreachable
+#    reject_when_unreachable: true  # UE (PPF cleared): answer 504 UE_NOT_REACHABLE
+#                                   # instead of paging; default false (Open5GS)
 
 ################################################################################
 # SBI Server

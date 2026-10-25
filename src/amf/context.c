@@ -134,6 +134,9 @@ static int amf_context_prepare(void)
     self.time.implicit_deregistration.configured = false;
     self.time.implicit_deregistration.value = 0;
 
+    /* PANIC: UE inalcançável continua a ser chamado (como no Open5GS) */
+    self.reachability.reject_when_unreachable = false;
+
     return OGS_OK;
 }
 
@@ -1126,6 +1129,22 @@ int amf_context_parse_config(void)
                         } else
                             ogs_warn("unknown key `%s`", time_key);
                     }
+                } else if (!strcmp(amf_key, "reachability")) {
+                    /* PANIC: resposta a N1N2 para UEs inalcançáveis */
+                    ogs_yaml_iter_t reach_iter;
+                    ogs_yaml_iter_recurse(&amf_iter, &reach_iter);
+
+                    while (ogs_yaml_iter_next(&reach_iter)) {
+                        const char *reach_key =
+                            ogs_yaml_iter_key(&reach_iter);
+                        ogs_assert(reach_key);
+
+                        if (!strcmp(reach_key, "reject_when_unreachable"))
+                            self.reachability.reject_when_unreachable =
+                                ogs_yaml_iter_bool(&reach_iter);
+                        else
+                            ogs_warn("unknown key `%s`", reach_key);
+                    }
                 } else if (!strcmp(amf_key, "default")) {
                     /* handle config in sbi library */
                 } else if (!strcmp(amf_key, "sbi")) {
@@ -1732,6 +1751,7 @@ amf_ue_t *amf_ue_add(ran_ue_t *ran_ue)
 
     /* PANIC: cada UE começa com o T3512 global */
     amf_ue->t3512_value = self.time.t3512.value;
+    amf_ue->ppf = true;     /* PANIC: alcançável por paging até prova em contrário */
 
     /* SBI Type */
     amf_ue->sbi.type = OGS_SBI_OBJ_UE_TYPE;

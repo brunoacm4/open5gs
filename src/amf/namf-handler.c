@@ -232,6 +232,28 @@ int amf_namf_comm_handle_n1_n2_message_transfer(
                 uint16_t fqdn_port = 0;
                 ogs_sockaddr_t *addr = NULL, *addr6 = NULL;
 
+                /*
+                 * PANIC: UE inalcançável (PPF limpo): TS 23.502 4.2.3.3, "the
+                 * AMF shall send an N1N2MessageTransfer response ... to
+                 * indicate that the UE is not reachable", sem paging. 504 com
+                 * ProblemDetails (cause UE_NOT_REACHABLE): o SMF trata qualquer
+                 * estado que não seja 200/202 sem abortar.
+                 */
+                if (amf_self()->reachability.reject_when_unreachable &&
+                    amf_ue->ppf == false) {
+                    ogs_warn("[%s:%d] UE not reachable: N1N2 rejected",
+                            amf_ue->supi, sess->psi);
+                    if (n1buf)
+                        ogs_pkbuf_free(n1buf);
+                    if (n2buf)
+                        ogs_pkbuf_free(n2buf);
+                    ogs_assert(true == ogs_sbi_server_send_error(stream,
+                                OGS_SBI_HTTP_STATUS_GATEWAY_TIMEOUT, recvmsg,
+                                "UE not reachable", amf_ue->supi,
+                                OGS_SBI_APP_STRERROR_UE_NOT_REACHABLE));
+                    return OGS_OK;
+                }
+
                 if (!N1N2MessageTransferReqData->n1n2_failure_txf_notif_uri) {
                     ogs_error("[%s:%d] No n1-n2-failure-notification-uri",
                             amf_ue->supi, sess->psi);
@@ -334,6 +356,20 @@ int amf_namf_comm_handle_n1_n2_message_transfer(
         if (CM_IDLE(amf_ue)) {
             ogs_sbi_server_t *server = NULL;
             ogs_sbi_header_t header;
+
+            /* PANIC: UE inalcançável, como no ramo do Service Request */
+            if (amf_self()->reachability.reject_when_unreachable &&
+                amf_ue->ppf == false) {
+                ogs_warn("[%s:%d] UE not reachable: N1N2 rejected",
+                        amf_ue->supi, sess->psi);
+                ogs_pkbuf_free(n1buf);
+                ogs_pkbuf_free(n2buf);
+                ogs_assert(true == ogs_sbi_server_send_error(stream,
+                            OGS_SBI_HTTP_STATUS_GATEWAY_TIMEOUT, recvmsg,
+                            "UE not reachable", amf_ue->supi,
+                            OGS_SBI_APP_STRERROR_UE_NOT_REACHABLE));
+                return OGS_OK;
+            }
 
             status = OGS_SBI_HTTP_STATUS_ACCEPTED;
             N1N2MessageTransferRspData.cause =

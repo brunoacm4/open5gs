@@ -867,6 +867,7 @@ void ngap_handle_initial_ue_message(amf_gnb_t *gnb, ogs_ngap_message_t *message)
          */
         CLEAR_AMF_UE_TIMER(amf_ue->mobile_reachable);
         CLEAR_AMF_UE_TIMER(amf_ue->implicit_deregistration);
+        amf_ue->ppf = true;     /* PANIC: o UE voltou a contactar a rede */
     }
 
     ogs_ngap_ASN_to_nr_cgi(
