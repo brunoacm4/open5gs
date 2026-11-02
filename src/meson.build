@@ -52,3 +52,7 @@ subdir('ausf')
 subdir('upf')
 subdir('smf')
 subdir('amf')
+
+if get_option('box')
+    subdir('box')
+endif
