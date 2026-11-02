@@ -36,7 +36,7 @@ int ngap_handle_path_switch_request_transfer(
         smf_sess_t *sess, ogs_sbi_stream_t *stream, ogs_pkbuf_t *pkbuf);
 int ngap_handle_handover_required_transfer(
         smf_sess_t *sess, ogs_sbi_stream_t *stream, ogs_pkbuf_t *pkbuf);
-int ngap_handle_handover_request_ack(
+int smf_ngap_handle_handover_request_ack(
         smf_sess_t *sess, ogs_sbi_stream_t *stream, ogs_pkbuf_t *pkbuf);
 
 #ifdef __cplusplus

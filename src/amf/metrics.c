@@ -162,7 +162,7 @@ int amf_metrics_free_inst_global(void)
 }
 
 /* BY SLICE */
-const char *labels_slice[] = {
+static const char *labels_slice[] = {
     "plmnid",
     "snssai"
 };
@@ -176,7 +176,7 @@ const char *labels_slice[] = {
         .labels = labels_slice, \
     },
 ogs_metrics_spec_t *amf_metrics_spec_by_slice[_AMF_METR_BY_SLICE_MAX];
-ogs_hash_t *metrics_hash_by_slice = NULL;   /* hash table for SLICE labels */
+static ogs_hash_t *metrics_hash_by_slice = NULL;   /* hash table for SLICE labels */
 amf_metrics_spec_def_t amf_metrics_spec_def_by_slice[_AMF_METR_BY_SLICE_MAX] = {
 /* Gauges: */
 AMF_METR_BY_SLICE_GAUGE_ENTRY(
@@ -260,7 +260,7 @@ int amf_metrics_free_inst_by_slice(ogs_metrics_inst_t **inst)
 }
 
 /* BY CAUSE */
-const char *labels_cause[] = {
+static const char *labels_cause[] = {
     "cause"
 };
 
@@ -273,7 +273,7 @@ const char *labels_cause[] = {
         .labels = labels_cause, \
     },
 ogs_metrics_spec_t *amf_metrics_spec_by_cause[_AMF_METR_BY_CAUSE_MAX];
-ogs_hash_t *metrics_hash_by_cause = NULL;   /* hash table for CAUSE labels */
+static ogs_hash_t *metrics_hash_by_cause = NULL;   /* hash table for CAUSE labels */
 amf_metrics_spec_def_t amf_metrics_spec_def_by_cause[_AMF_METR_BY_CAUSE_MAX] = {
 /* Counters: */
 AMF_METR_BY_CAUSE_CTR_ENTRY(
@@ -348,10 +348,10 @@ int amf_metrics_free_inst_by_cause(ogs_metrics_inst_t **inst)
     return amf_metrics_free_inst(inst, _AMF_METR_BY_CAUSE_MAX);
 }
 
-void amf_metrics_init(void)
+/* PANIC: the specs alone, because a box has one metrics context for all its NFs */
+void amf_metrics_specs_init(void)
 {
     ogs_metrics_context_t *ctx = ogs_metrics_self();
-    ogs_metrics_context_init();
 
     amf_metrics_init_spec(ctx, amf_metrics_spec_global, amf_metrics_spec_def_global,
             _AMF_METR_GLOB_MAX);
@@ -367,7 +367,13 @@ void amf_metrics_init(void)
     amf_metrics_init_by_cause();
 }
 
-void amf_metrics_final(void)
+void amf_metrics_init(void)
+{
+    ogs_metrics_context_init();
+    amf_metrics_specs_init();
+}
+
+void amf_metrics_specs_final(void)
 {
     ogs_hash_index_t *hi;
 
@@ -401,6 +407,10 @@ void amf_metrics_final(void)
         }
         ogs_hash_destroy(metrics_hash_by_cause);
     }
+}
 
+void amf_metrics_final(void)
+{
+    amf_metrics_specs_final();
     ogs_metrics_context_final();
 }

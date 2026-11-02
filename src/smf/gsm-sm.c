@@ -2167,7 +2167,7 @@ void smf_gsm_state_operational(ogs_fsm_t *s, smf_event_t *e)
             break;
 
         case OpenAPI_n2_sm_info_type_HANDOVER_REQ_ACK:
-            rv = ngap_handle_handover_request_ack(sess, stream, pkbuf);
+            rv = smf_ngap_handle_handover_request_ack(sess, stream, pkbuf);
             if (rv != OGS_OK) {
                 ogs_error("[%s:%d] Cannot handle NGAP message",
                         smf_ue->supi, sess->psi);

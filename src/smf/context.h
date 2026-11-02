@@ -174,6 +174,9 @@ typedef struct smf_context_s {
         bool enabled;
     } persistence;
 
+    /* PANIC: the SMF's own NF instance inside a box; NULL means self */
+    ogs_sbi_nf_instance_t *nf_instance;
+
 #define SMF_UE_IS_LAST_SESSION(__sMF) \
      ((__sMF) && (ogs_list_count(&(__sMF)->sess_list)) == 1)
     ogs_list_t      smf_ue_list;
@@ -749,6 +752,7 @@ typedef struct smf_sess_s {
 void smf_context_init(void);
 void smf_context_final(void);
 smf_context_t *smf_self(void);
+ogs_sbi_nf_instance_t *smf_nf_instance(void);
 
 int smf_context_parse_config(void);
 

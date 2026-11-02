@@ -199,7 +199,7 @@ int smf_metrics_free_inst_gtp_node(ogs_metrics_inst_t **inst)
 }
 
 /* BY SLICE */
-const char *labels_slice[] = {
+static const char *labels_slice[] = {
     "plmnid",
     "snssai"
 };
@@ -221,7 +221,7 @@ const char *labels_slice[] = {
         .labels = labels_slice, \
     },
 ogs_metrics_spec_t *smf_metrics_spec_by_slice[_SMF_METR_BY_SLICE_MAX];
-ogs_hash_t *metrics_hash_by_slice = NULL;   /* hash table for SLICE labels */
+static ogs_hash_t *metrics_hash_by_slice = NULL;   /* hash table for SLICE labels */
 smf_metrics_spec_def_t smf_metrics_spec_def_by_slice[_SMF_METR_BY_SLICE_MAX] = {
 /* Gauges: */
 SMF_METR_BY_SLICE_GAUGE_ENTRY(
@@ -417,7 +417,7 @@ int smf_metrics_free_inst_by_5qi(ogs_metrics_inst_t **inst)
 }
 
 /* BY CAUSE */
-const char *labels_cause[] = {
+static const char *labels_cause[] = {
     "cause"
 };
 
@@ -430,7 +430,7 @@ const char *labels_cause[] = {
         .labels = labels_cause, \
     },
 ogs_metrics_spec_t *smf_metrics_spec_by_cause[_SMF_METR_BY_CAUSE_MAX];
-ogs_hash_t *metrics_hash_by_cause = NULL;   /* hash table for CAUSE labels */
+static ogs_hash_t *metrics_hash_by_cause = NULL;   /* hash table for CAUSE labels */
 smf_metrics_spec_def_t smf_metrics_spec_def_by_cause[_SMF_METR_BY_CAUSE_MAX] = {
 /* Counters: */
 SMF_METR_BY_CAUSE_CTR_ENTRY(
@@ -493,10 +493,10 @@ int smf_metrics_free_inst_by_cause(ogs_metrics_inst_t **inst)
     return smf_metrics_free_inst(inst, _SMF_METR_BY_CAUSE_MAX);
 }
 
-void smf_metrics_init(void)
+/* PANIC: the specs alone, because a box has one metrics context for all its NFs */
+void smf_metrics_specs_init(void)
 {
     ogs_metrics_context_t *ctx = ogs_metrics_self();
-    ogs_metrics_context_init();
 
     smf_metrics_init_spec(ctx, smf_metrics_spec_global, smf_metrics_spec_def_global,
             _SMF_METR_GLOB_MAX);
@@ -517,7 +517,13 @@ void smf_metrics_init(void)
     smf_metrics_init_by_cause();
 }
 
-void smf_metrics_final(void)
+void smf_metrics_init(void)
+{
+    ogs_metrics_context_init();
+    smf_metrics_specs_init();
+}
+
+void smf_metrics_specs_final(void)
 {
     ogs_hash_index_t *hi;
 
@@ -566,6 +572,10 @@ void smf_metrics_final(void)
         }
         ogs_hash_destroy(metrics_hash_by_cause);
     }
+}
 
+void smf_metrics_final(void)
+{
+    smf_metrics_specs_final();
     ogs_metrics_context_final();
 }

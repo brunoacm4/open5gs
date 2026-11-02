@@ -838,7 +838,7 @@ cleanup:
     return rv;
 }
 
-int ngap_handle_handover_request_ack(
+int smf_ngap_handle_handover_request_ack(
         smf_sess_t *sess, ogs_sbi_stream_t *stream, ogs_pkbuf_t *pkbuf)
 {
     smf_ue_t *smf_ue = NULL;

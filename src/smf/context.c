@@ -163,6 +163,11 @@ smf_context_t *smf_self(void)
     return &self;
 }
 
+ogs_sbi_nf_instance_t *smf_nf_instance(void)
+{
+    return self.nf_instance ? self.nf_instance : ogs_sbi_self()->nf_instance;
+}
+
 static int smf_context_prepare(void)
 {
     self.diam_config->cnf_port = DIAMETER_PORT;
@@ -179,7 +184,7 @@ static int smf_context_validation(void)
     ogs_sbi_nf_instance_t *nf_instance = NULL;
     ogs_sbi_nf_info_t *nf_info = NULL;
 
-    nf_instance = ogs_sbi_self()->nf_instance;
+    nf_instance = smf_nf_instance();
     ogs_assert(nf_instance);
 
     if (self.dns[0] == NULL && self.dns6[0] == NULL) {
@@ -629,7 +634,7 @@ int smf_context_parse_config(void)
                     ogs_yaml_iter_t info_array, info_iter;
                     ogs_yaml_iter_recurse(&smf_iter, &info_array);
 
-                    nf_instance = ogs_sbi_self()->nf_instance;
+                    nf_instance = smf_nf_instance();
                     ogs_assert(nf_instance);
 
                     do {

@@ -391,7 +391,9 @@ void ogs_sbi_nf_state_registered(ogs_fsm_t *s, ogs_event_t *e)
                 }
 
                 ogs_nnrf_nfm_send_nf_status_subscribe(
-                        ogs_sbi_self()->nf_instance->nf_type,
+                        subscription_spec->requester_nf_type ?
+                            subscription_spec->requester_nf_type :
+                            ogs_sbi_self()->nf_instance->nf_type,
                         ogs_sbi_self()->nf_instance->id,
                         subscription_spec->subscr_cond.nf_type,
                         subscription_spec->subscr_cond.service_name);

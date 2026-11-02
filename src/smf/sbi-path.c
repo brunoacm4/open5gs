@@ -21,24 +21,12 @@
 #include "ngap-path.h"
 #include "sbi-path.h"
 
-int smf_sbi_open(void)
+/* PANIC: what the SMF advertises, on self or on its local instance in a box */
+void smf_sbi_build_profile(ogs_sbi_nf_instance_t *nf_instance)
 {
-    ogs_sbi_nf_instance_t *nf_instance = NULL;
     ogs_sbi_nf_service_t *service = NULL;
 
-    /*
-     * SMF can only run to support 4G EPC mode.
-     *
-     * If the SMF is only running in 4G EPC mode,
-     * it should not send NFRegister/NFStatusSubscribe messages to the NRF.
-     */
-    if (ogs_sbi_server_first() == NULL)
-        return OGS_OK;
-
-    /* Initialize SELF NF instance */
-    nf_instance = ogs_sbi_self()->nf_instance;
     ogs_assert(nf_instance);
-    ogs_sbi_nf_fsm_init(nf_instance);
 
     /* Build NF instance information. It will be transmitted to NRF. */
     ogs_sbi_nf_instance_build_default(nf_instance);
@@ -56,6 +44,27 @@ int smf_sbi_open(void)
         ogs_sbi_nf_service_add_allowed_nf_type(service, OpenAPI_nf_type_AMF);
         ogs_sbi_nf_service_add_allowed_nf_type(service, OpenAPI_nf_type_SMF);
     }
+}
+
+int smf_sbi_open(void)
+{
+    ogs_sbi_nf_instance_t *nf_instance = NULL;
+
+    /*
+     * SMF can only run to support 4G EPC mode.
+     *
+     * If the SMF is only running in 4G EPC mode,
+     * it should not send NFRegister/NFStatusSubscribe messages to the NRF.
+     */
+    if (ogs_sbi_server_first() == NULL)
+        return OGS_OK;
+
+    /* Initialize SELF NF instance */
+    nf_instance = ogs_sbi_self()->nf_instance;
+    ogs_assert(nf_instance);
+    ogs_sbi_nf_fsm_init(nf_instance);
+
+    smf_sbi_build_profile(nf_instance);
 
     /* Initialize NRF NF Instance */
     nf_instance = ogs_sbi_self()->nrf_instance;
@@ -213,6 +222,9 @@ int smf_sbi_discover_and_send(
         return OGS_ERROR;
     }
 
+    /* PANIC: in a box, self may be another NF type */
+    xact->requester_nf_type = OpenAPI_nf_type_SMF;
+
     xact->state = state;
 
     if (stream) {
@@ -270,6 +282,9 @@ ogs_sbi_xact_t *smf_namf_comm_create_n1_n2_message_xact(
         ogs_error("ogs_sbi_xact_add() failed");
         return NULL;
     }
+
+    /* PANIC: in a box, self may be another NF type */
+    xact->requester_nf_type = OpenAPI_nf_type_SMF;
 
     xact->state = param->state;
 

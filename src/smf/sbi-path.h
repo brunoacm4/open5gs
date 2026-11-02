@@ -31,6 +31,7 @@
 extern "C" {
 #endif
 
+void smf_sbi_build_profile(ogs_sbi_nf_instance_t *nf_instance);
 int smf_sbi_open(void);
 void smf_sbi_close(void);
 

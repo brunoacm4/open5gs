@@ -394,6 +394,9 @@ typedef struct ogs_sbi_subscription_spec_s {
         OpenAPI_service_name_e service_name;    /* ServiceName */
     } subscr_cond;
 
+    /* PANIC: who subscribes, when it is not self (an NF inside a box) */
+    OpenAPI_nf_type_e requester_nf_type;
+
 } ogs_sbi_subscription_spec_t;
 
 typedef struct ogs_sbi_subscription_data_s {

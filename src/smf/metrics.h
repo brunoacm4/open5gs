@@ -100,6 +100,8 @@ void smf_metrics_inst_by_cause_add(
     int cause, smf_metric_type_by_cause_t t, int val);
 void smf_metrics_init(void);
 void smf_metrics_final(void);
+void smf_metrics_specs_init(void);
+void smf_metrics_specs_final(void);
 
 #ifdef __cplusplus
 }

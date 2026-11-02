@@ -44,7 +44,8 @@ typedef struct NGAP_NGAP_PDU ogs_ngap_message_t;
 typedef long NGAP_ProcedureCode_t;
 
 typedef enum {
-    SMF_EVT_BASE = OGS_MAX_NUM_OF_PROTO_EVENT,
+    /* PANIC: clear of the AMF's range, so that a box can tell them apart */
+    SMF_EVT_BASE = OGS_MAX_NUM_OF_PROTO_EVENT + 64,
 
     SMF_EVT_S5C_MESSAGE,
     SMF_EVT_S6B_MESSAGE,

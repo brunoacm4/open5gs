@@ -26,6 +26,7 @@
 #include "gnb-info.h"
 #include "ue-info.h"
 #include "persistence.h"
+#include "part.h"
 
 static ogs_thread_t *thread;
 static void amf_main(void *data);
@@ -54,14 +55,11 @@ int amf_initialize(void)
     rv = ogs_metrics_context_parse_config(APP_NAME);
     if (rv != OGS_OK) return rv;
 
-    rv = amf_context_parse_config();
-    if (rv != OGS_OK) return rv;
-
-    rv = amf_context_nf_info();
+    rv = amf_part_config();
     if (rv != OGS_OK) return rv;
 
     /* PANIC: contexto persistente (fase 1b) no MongoDB de db_uri */
-    if (amf_self()->persistence.enabled) {
+    if (amf_part_uses_db()) {
         if (!ogs_app()->db_uri) {
             ogs_error("amf.persistence.enabled needs db_uri");
             return OGS_ERROR;
@@ -72,19 +70,10 @@ int amf_initialize(void)
 
     ogs_metrics_context_open(ogs_metrics_self());
 
-    /* dumpers /gnb-info /ue-info */
-    ogs_metrics_register_custom_ep(amf_dump_gnb_info, "/gnb-info");
-    ogs_metrics_register_custom_ep(amf_dump_ue_info, "/ue-info");
-
-    /* PANIC: contexto persistente. Reconstruir os UEs registados antes de
-     * abrir o SBI e o NGAP (precisa das métricas, para o estado registado) */
-    rv = amf_persistence_restore();
+    rv = amf_part_restore();
     if (rv != OGS_OK) return rv;
 
-    rv = amf_sbi_open();
-    if (rv != OGS_OK) return rv;
-
-    rv = ngap_open();
+    rv = amf_part_open();
     if (rv != OGS_OK) return rv;
 
     thread = ogs_thread_create(amf_main, NULL);
@@ -93,6 +82,102 @@ int amf_initialize(void)
     initialized = 1;
 
     return OGS_OK;
+}
+
+void amf_part_metrics_init(void)
+{
+    amf_metrics_specs_init();
+}
+
+void amf_part_metrics_final(void)
+{
+    amf_metrics_specs_final();
+}
+
+void amf_part_context_init(void)
+{
+    amf_context_init();
+}
+
+int amf_part_config(void)
+{
+    int rv;
+
+    rv = amf_context_parse_config();
+    if (rv != OGS_OK) return rv;
+
+    return amf_context_nf_info();
+}
+
+bool amf_part_uses_db(void)
+{
+    return amf_self()->persistence.enabled;
+}
+
+int amf_part_restore(void)
+{
+    /* dumpers /gnb-info /ue-info */
+    ogs_metrics_register_custom_ep(amf_dump_gnb_info, "/gnb-info");
+    ogs_metrics_register_custom_ep(amf_dump_ue_info, "/ue-info");
+
+    /* PANIC: contexto persistente. Reconstruir os UEs registados antes de
+     * abrir o SBI e o NGAP (precisa das métricas, para o estado registado) */
+    return amf_persistence_restore();
+}
+
+int amf_part_open(void)
+{
+    int rv;
+
+    rv = amf_sbi_open();
+    if (rv != OGS_OK) return rv;
+
+    return ngap_open();
+}
+
+void amf_part_stop(void)
+{
+    /* PANIC: contexto persistente. O encerramento remove os contextos da RAM,
+     * mas não os desregista: não mexer na base de dados daqui em diante */
+    amf_persistence_stop();
+}
+
+void amf_part_close(void)
+{
+    ngap_close();
+    amf_sbi_close();
+}
+
+void amf_part_final(void)
+{
+    amf_context_final();
+}
+
+int amf_part_event_base(void)
+{
+    return AMF_EVENT_BASE;
+}
+
+int amf_part_event_top(void)
+{
+    return MAX_NUM_OF_AMF_EVENT;
+}
+
+static ogs_fsm_t part_sm;
+
+void amf_part_fsm_init(void)
+{
+    ogs_fsm_init(&part_sm, amf_state_initial, amf_state_final, 0);
+}
+
+void amf_part_fsm_fini(void)
+{
+    ogs_fsm_fini(&part_sm, 0);
+}
+
+void amf_part_dispatch(void *e)
+{
+    ogs_fsm_dispatch(&part_sm, e);
 }
 
 static ogs_timer_t *t_termination_holding = NULL;
@@ -123,24 +208,21 @@ void amf_terminate(void)
 {
     if (!initialized) return;
 
-    /* PANIC: contexto persistente. O encerramento remove os contextos da RAM,
-     * mas não os desregista: não mexer na base de dados daqui em diante */
-    amf_persistence_stop();
+    amf_part_stop();
 
     /* Daemon terminating */
     event_termination();
     ogs_thread_destroy(thread);
     ogs_timer_delete(t_termination_holding);
 
-    ngap_close();
-    amf_sbi_close();
+    amf_part_close();
 
     ogs_metrics_context_close(ogs_metrics_self());
 
-    if (amf_self()->persistence.enabled)
+    if (amf_part_uses_db())
         ogs_dbi_final();
 
-    amf_context_final();
+    amf_part_final();
     ogs_sbi_context_final();
 
     amf_metrics_final();
