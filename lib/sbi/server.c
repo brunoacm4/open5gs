@@ -184,6 +184,26 @@ bool ogs_sbi_server_send_response(
     return ogs_sbi_server_actions.send_response(stream, response);
 }
 
+bool ogs_sbi_server_deliver_local(
+        int (*client_cb)(int status, ogs_sbi_response_t *response, void *data),
+        ogs_sbi_request_t *request, void *data)
+{
+    ogs_sbi_server_t *server = ogs_sbi_server_first();
+
+    ogs_assert(server);
+    ogs_assert(ogs_sbi_server_actions.deliver_local);
+
+    return ogs_sbi_server_actions.deliver_local(
+            server, client_cb, request, data);
+}
+
+void ogs_sbi_server_close_local(void)
+{
+    ogs_assert(ogs_sbi_server_actions.close_local);
+
+    ogs_sbi_server_actions.close_local();
+}
+
 bool ogs_sbi_server_send_problem(
         ogs_sbi_stream_t *stream, OpenAPI_problem_details_t *problem)
 {

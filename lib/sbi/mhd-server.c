@@ -65,6 +65,9 @@ const ogs_sbi_server_actions_t ogs_mhd_server_actions = {
 
     xact_attach,
     xact_detach,
+
+    NULL,
+    NULL,
 };
 
 static void run(short when, ogs_socket_t fd, void *data);

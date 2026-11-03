@@ -796,6 +796,9 @@ bool ogs_sbi_client_send_request(
     }
     ogs_debug("[%s] %s", request->h.method, request->h.uri);
 
+    if (client->in_process)
+        return ogs_sbi_server_deliver_local(client_cb, request, data);
+
     conn = connection_add(client, client_cb, request, data);
     if (!conn) {
         ogs_error("connection_add() failed");

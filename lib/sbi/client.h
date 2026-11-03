@@ -90,6 +90,12 @@ typedef struct ogs_sbi_client_s {
 
     char *resolve;
 
+    /*
+     * PANIC, technique T2 (notes/adr/0004): this client is the process's own
+     * server. Requests go to it without HTTP/2. Only a box sets this.
+     */
+    bool in_process;
+
     ogs_timer_t     *t_curl;            /* timer for CURL */
     ogs_list_t      connection_list;    /* CURL connection list */
 

@@ -107,6 +107,9 @@ static void box_main(void *data)
             part_of_event(e)->dispatch(e);
             ogs_event_free(e);
         }
+
+        /* Technique T2: no handler is using the streams answered in-process */
+        ogs_sbi_server_close_local();
     }
 done:
 

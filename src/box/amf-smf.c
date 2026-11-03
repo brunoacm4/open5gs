@@ -3,7 +3,9 @@
  *
  * One YAML with the sections global, amf and smf (notes/adr/0003): one SBI
  * server, one NRF client and one metrics server, all under amf. Only the AMF
- * registers in the NRF; the SMF is a local instance (notes/adr/0002).
+ * registers in the NRF; the SMF is a local instance (notes/adr/0002). The
+ * parts talk over HTTP/2 on lo (technique T1) or, with box.sbi_in_process,
+ * without it (technique T2, notes/adr/0004).
  */
 
 #include "ogs-sctp.h"
@@ -25,6 +27,36 @@ static const box_part_t parts[] = {
 };
 
 static int initialized = 0;
+
+/* box.sbi_in_process: technique T2 instead of T1 (notes/adr/0004) */
+static bool sbi_in_process(void)
+{
+    yaml_document_t *document = ogs_app()->document;
+    ogs_yaml_iter_t root_iter, box_iter;
+    bool enabled = false;
+
+    ogs_assert(document);
+
+    ogs_yaml_iter_init(&root_iter, document);
+    while (ogs_yaml_iter_next(&root_iter)) {
+        const char *root_key = ogs_yaml_iter_key(&root_iter);
+        ogs_assert(root_key);
+        if (strcmp(root_key, "box"))
+            continue;
+
+        ogs_yaml_iter_recurse(&root_iter, &box_iter);
+        while (ogs_yaml_iter_next(&box_iter)) {
+            const char *box_key = ogs_yaml_iter_key(&box_iter);
+            ogs_assert(box_key);
+            if (!strcmp(box_key, "sbi_in_process"))
+                enabled = ogs_yaml_iter_bool(&box_iter);
+            else
+                ogs_warn("unknown key `%s`", box_key);
+        }
+    }
+
+    return enabled;
+}
 
 int app_initialize(const char *const argv[])
 {
@@ -93,6 +125,15 @@ int app_initialize(const char *const argv[])
 
     /* The SMF part reaches the AMF part through self, which has no client */
     ogs_sbi_client_associate(ogs_sbi_self()->nf_instance);
+
+    /* The local SMF instance has the same address, so the same client */
+    if (sbi_in_process()) {
+        ogs_sbi_client_t *client =
+            NF_INSTANCE_CLIENT(ogs_sbi_self()->nf_instance);
+        ogs_assert(client);
+        client->in_process = true;
+        ogs_info("SBI between the parts: in-process");
+    }
 
     smf_part_subscribe();
 

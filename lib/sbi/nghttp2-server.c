@@ -46,6 +46,11 @@ static void *stream_find_by_id(ogs_pool_id_t id);
 static void xact_attach(ogs_sbi_stream_t *stream, ogs_sbi_xact_t *xact);
 static void xact_detach(ogs_sbi_xact_t *xact);
 
+static bool deliver_local(ogs_sbi_server_t *server,
+        int (*client_cb)(int status, ogs_sbi_response_t *response, void *data),
+        ogs_sbi_request_t *sent, void *data);
+static void close_local(void);
+
 const ogs_sbi_server_actions_t ogs_nghttp2_server_actions = {
     server_init,
     server_final,
@@ -64,6 +69,9 @@ const ogs_sbi_server_actions_t ogs_nghttp2_server_actions = {
 
     xact_attach,
     xact_detach,
+
+    deliver_local,
+    close_local,
 };
 
 struct h2_settings {
@@ -111,12 +119,26 @@ typedef struct ogs_sbi_stream_s {
      * than lingering until the SBI client wait timeout.
      */
     ogs_list_t              xact_list;
+
+    /* Only on a local stream: who gets the response */
+    ogs_sbi_client_cb_f     client_cb;
+    void                    *client_data;
 } ogs_sbi_stream_t;
+
+/*
+ * PANIC, technique T2 (notes/adr/0004): the streams of requests from this
+ * process belong to these two sessions, which have no socket. A stream is in
+ * local_open until it is answered, and then in local_closing until the event
+ * loop is done with the handler that answered: as with HTTP/2, where the
+ * stream closes after the socket write, the request outlives the send.
+ */
+static ogs_sbi_session_t local_open, local_closing;
 
 static void session_remove(ogs_sbi_session_t *sbi_sess);
 static void session_remove_all(ogs_sbi_server_t *server);
 
 static void stream_remove(ogs_sbi_stream_t *stream);
+static void stream_remove_all(ogs_sbi_session_t *sbi_sess);
 
 static void accept_handler(short when, ogs_socket_t fd, void *data);
 static void recv_handler(short when, ogs_socket_t fd, void *data);
@@ -500,6 +522,9 @@ static void server_stop(ogs_sbi_server_t *server)
     if (server->node.sock)
         ogs_sock_destroy(server->node.sock);
 
+    stream_remove_all(&local_open);
+    stream_remove_all(&local_closing);
+
     session_remove_all(server);
 }
 
@@ -735,12 +760,41 @@ static bool server_send_rspmem_persistent(
     return true;
 }
 
+/* The response changes hands: the client's callback now owns it */
+static bool send_response_local(
+        ogs_sbi_stream_t *stream, ogs_sbi_response_t *response)
+{
+    if (stream->session != &local_open) {
+        ogs_error("Local stream answered twice [%d]", response->status);
+        ogs_sbi_response_free(response);
+        return false;
+    }
+
+    /* What check_multi_info() in client.c fills in */
+    response->h.method = ogs_strdup(stream->request->h.method);
+    ogs_assert(response->h.method);
+    response->h.uri = ogs_strdup(stream->request->h.uri);
+    ogs_assert(response->h.uri);
+
+    ogs_list_remove(&local_open.stream_list, stream);
+    ogs_list_add(&local_closing.stream_list, stream);
+    stream->session = &local_closing;
+
+    stream->client_cb(OGS_OK, response, stream->client_data);
+
+    return true;
+}
+
 static bool server_send_response(
         ogs_sbi_stream_t *stream, ogs_sbi_response_t *response)
 {
     bool rc;
 
     ogs_assert(response);
+
+    if (stream && (stream->session == &local_open ||
+                stream->session == &local_closing))
+        return send_response_local(stream, response);
 
     rc = server_send_rspmem_persistent(stream, response);
 
@@ -904,6 +958,140 @@ static ogs_pool_id_t id_from_stream(ogs_sbi_stream_t *stream)
 static void *stream_find_by_id(ogs_pool_id_t id)
 {
     return ogs_pool_find_by_id(&stream_pool, id);
+}
+
+/* The value of :path: the URI, with its query going to the parameters */
+static int request_set_path(ogs_sbi_request_t *request, char *path)
+{
+    char *saveptr = NULL, *query;
+#define MAX_NUM_OF_PARAM_IN_QUERY 16
+    struct yuarel_param params[MAX_NUM_OF_PARAM_IN_QUERY+2];
+    int j;
+
+    ogs_assert(request->h.uri == NULL);
+    request->h.uri = ogs_sbi_parse_uri(path, "?", &saveptr);
+    ogs_assert(request->h.uri);
+
+    memset(params, 0, sizeof(params));
+
+    query = ogs_sbi_parse_uri(NULL, "?", &saveptr);
+    if (query && *query && strlen(query))
+        yuarel_parse_query(query, '&', params, MAX_NUM_OF_PARAM_IN_QUERY+1);
+
+    j = 0;
+    while(params[j].key && params[j].val) {
+        if (j >= MAX_NUM_OF_PARAM_IN_QUERY) {
+            ogs_error("Too many query params (max=%d)",
+                    MAX_NUM_OF_PARAM_IN_QUERY);
+
+            ogs_free(query);
+
+            return OGS_ERROR;
+        }
+
+        if (strlen(params[j].key))
+            ogs_sbi_header_set(request->http.params,
+                    params[j].key, params[j].val);
+        else
+            ogs_warn("No KEY in Query-Parms");
+
+        j++;
+    }
+
+    ogs_free(query);
+
+    return OGS_OK;
+}
+
+/*
+ * The stream's request is a copy, because callers may free theirs right after
+ * sending, and the server keeps what it would have read from HTTP/2. Delivering
+ * only queues an event: no state machine runs inside this call.
+ */
+static bool deliver_local(ogs_sbi_server_t *server,
+        int (*client_cb)(int status, ogs_sbi_response_t *response, void *data),
+        ogs_sbi_request_t *sent, void *data)
+{
+    ogs_sbi_stream_t *stream = NULL;
+    ogs_sbi_request_t *request = NULL;
+    ogs_hash_index_t *hi = NULL;
+    char *path = NULL;
+    int rv;
+
+    ogs_assert(server);
+    ogs_assert(server->cb);
+    ogs_assert(client_cb);
+    ogs_assert(sent);
+    ogs_assert(sent->h.method);
+    ogs_assert(sent->h.uri);
+
+    local_open.server = server;
+    local_closing.server = server;
+
+    stream = stream_add(&local_open, 0);
+    if (!stream) {
+        ogs_error("stream_add() failed");
+        return false;
+    }
+
+    stream->client_cb = client_cb;
+    stream->client_data = data;
+
+    request = stream->request;
+
+    request->h.method = ogs_strdup(sent->h.method);
+    ogs_assert(request->h.method);
+
+    /* http://host:port/path, as the client has it, without scheme and host */
+    path = strstr(sent->h.uri, "://");
+    path = path ? strchr(path + 3, '/') : sent->h.uri;
+    ogs_assert(path);
+    path = ogs_strdup(path);
+    ogs_assert(path);
+    rv = request_set_path(request, path);
+    ogs_free(path);
+
+    if (rv != OGS_OK) {
+        ogs_sbi_server_send_error(stream,
+                OGS_SBI_HTTP_STATUS_BAD_REQUEST, NULL,
+                "Too many query parameters", NULL, NULL);
+        return true;
+    }
+
+    for (hi = ogs_hash_first(sent->http.params);
+            hi; hi = ogs_hash_next(hi))
+        ogs_sbi_header_set(request->http.params,
+                ogs_hash_this_key(hi), ogs_hash_this_val(hi));
+
+    /* Whoever reads these compares without case (RFC 2616, message.c) */
+    for (hi = ogs_hash_first(sent->http.headers);
+            hi; hi = ogs_hash_next(hi))
+        ogs_sbi_header_set(request->http.headers,
+                ogs_hash_this_key(hi), ogs_hash_this_val(hi));
+
+    if (sent->http.content && sent->http.content_length) {
+        request->http.content = ogs_malloc(sent->http.content_length + 1);
+        ogs_assert(request->http.content);
+        memcpy(request->http.content,
+                sent->http.content, sent->http.content_length);
+        request->http.content[sent->http.content_length] = '\0';
+        request->http.content_length = sent->http.content_length;
+    }
+
+    if (server->cb(request, OGS_UINT_TO_POINTER(stream->id)) != OGS_OK) {
+        /* ogs_sbi_server_handler() freed it, and stream_remove() frees one */
+        stream->request = ogs_sbi_request_new();
+        ogs_assert(stream->request);
+        stream_remove(stream);
+        return false;
+    }
+
+    return true;
+}
+
+static void close_local(void)
+{
+    stream_remove_all(&local_closing);
 }
 
 static ogs_sbi_session_t *session_add(
@@ -1473,48 +1661,16 @@ static int on_header(nghttp2_session *session, const nghttp2_frame *frame,
 
     if (namebuf.len == sizeof(PATH) - 1 &&
             memcmp(PATH, namebuf.base, namebuf.len) == 0) {
-        char *saveptr = NULL, *query;
-#define MAX_NUM_OF_PARAM_IN_QUERY 16
-        struct yuarel_param params[MAX_NUM_OF_PARAM_IN_QUERY+2];
-        int j;
+        if (request_set_path(request, valuestr) != OGS_OK) {
+            ogs_sbi_server_send_error(stream,
+                    OGS_SBI_HTTP_STATUS_BAD_REQUEST, NULL,
+                    "Too many query parameters", NULL, NULL);
 
-        ogs_assert(request->h.uri == NULL);
-        request->h.uri = ogs_sbi_parse_uri(valuestr, "?", &saveptr);
-        ogs_assert(request->h.uri);
+            ogs_free(namestr);
+            ogs_free(valuestr);
 
-        memset(params, 0, sizeof(params));
-
-        query = ogs_sbi_parse_uri(NULL, "?", &saveptr);
-        if (query && *query && strlen(query))
-            yuarel_parse_query(query, '&', params, MAX_NUM_OF_PARAM_IN_QUERY+1);
-
-        j = 0;
-        while(params[j].key && params[j].val) {
-            if (j >= MAX_NUM_OF_PARAM_IN_QUERY) {
-                ogs_error("Too many query params (max=%d)",
-                        MAX_NUM_OF_PARAM_IN_QUERY);
-                ogs_sbi_server_send_error(stream,
-                        OGS_SBI_HTTP_STATUS_BAD_REQUEST, NULL,
-                        "Too many query parameters", NULL, NULL);
-
-                ogs_free(query);
-
-                ogs_free(namestr);
-                ogs_free(valuestr);
-
-                return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-            }
-
-            if (strlen(params[j].key))
-                ogs_sbi_header_set(request->http.params,
-                        params[j].key, params[j].val);
-            else
-                ogs_warn("No KEY in Query-Parms");
-
-            j++;
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
         }
-
-        ogs_free(query);
 
     } else if (namebuf.len == sizeof(METHOD) - 1 &&
             memcmp(METHOD, namebuf.base, namebuf.len) == 0) {

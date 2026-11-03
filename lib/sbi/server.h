@@ -81,6 +81,18 @@ typedef struct ogs_sbi_server_actions_s {
      */
     void (*xact_attach)(ogs_sbi_stream_t *stream, ogs_sbi_xact_t *xact);
     void (*xact_detach)(ogs_sbi_xact_t *xact);
+
+    /*
+     * PANIC, technique T2 (notes/adr/0004): a request from this process
+     * reaches the server, and its response the client, without HTTP/2.
+     * Only the HTTP/2 backend has them. The caller of deliver_local keeps
+     * the request. close_local closes the streams already answered.
+     */
+    bool (*deliver_local)(ogs_sbi_server_t *server,
+            int (*client_cb)(
+                int status, ogs_sbi_response_t *response, void *data),
+            ogs_sbi_request_t *request, void *data);
+    void (*close_local)(void);
 } ogs_sbi_server_actions_t;
 
 void ogs_sbi_server_init(int num_of_session_pool, int num_of_stream_pool);
@@ -111,6 +123,11 @@ bool ogs_sbi_server_send_error(ogs_sbi_stream_t *stream,
 
 bool ogs_sbi_server_send_problem(
         ogs_sbi_stream_t *stream, OpenAPI_problem_details_t *problem);
+
+bool ogs_sbi_server_deliver_local(
+        int (*client_cb)(int status, ogs_sbi_response_t *response, void *data),
+        ogs_sbi_request_t *request, void *data);
+void ogs_sbi_server_close_local(void);
 
 ogs_sbi_server_t *ogs_sbi_server_from_stream(ogs_sbi_stream_t *stream);
 
